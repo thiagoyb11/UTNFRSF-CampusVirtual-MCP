@@ -54,7 +54,9 @@ El SDK ofrece contextos aislados con sus propios datos de navegación. La polít
 
 ## 3. Listar materias y establecer el patrón de extracción
 
-**Objetivo:** completar la primera operación académica desde un host MCP.
+**Objetivo:** listar y resolver asignaturas de la cuenta.
+
+**Avance:** helper interno `CourseService.list_degree_courses()` implementado y verificado contra My courses → Grado: 30 asignaturas, excluyendo Ingreso y Extensión. Reutiliza `Course`; todavía no existe una herramienta MCP pública `list_courses`. El recorrido y las restricciones están en [la guía de recursos](docs/guia-get-course-resources.md).
 
 1. Inspeccionar el listado de materias autenticado y sus mecanismos de carga o paginación.
 2. Incorporar un modelo `Course` con identificador, nombre y URL de origen.
@@ -85,6 +87,8 @@ El SDK admite extraer colecciones y atributos mediante selectores. Conviene conv
 ## 5. Encontrar y descargar bibliografía
 
 **Objetivo:** obtener archivos completos desde recursos accesibles para la cuenta.
+
+**Inspección completada:** dos materias específicas de Sistemas y dos Básicas, con formatos `topics` y `onetopic`, navegación de secciones, restricciones y dos carpetas reales. Ver [guía para implementar get_course_resources()](docs/guia-get-course-resources.md). La función y las descargas todavía no están implementadas.
 
 1. Implementar `list_course_resources`, recorriendo secciones y carpetas observadas, con filtros por materia o unidad. Diferenciar archivos descargables de páginas y enlaces externos.
 2. Validar con un recurso de prueba cómo funciona una descarga autenticada. No confundir `html`, `markdown` o `extract` con un mecanismo para obtener archivos binarios.

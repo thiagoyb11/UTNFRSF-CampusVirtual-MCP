@@ -94,6 +94,7 @@ La sesión se conserva en memoria durante la ejecución del proceso MCP y se cie
 - `browser/`: adaptador de Lightpanda y sesión compartida con acceso serializado.
 - `parsers/login.py`: identificación del formulario y señales de estado de la página.
 - `services/authentication.py`: flujo de acceso y política de reintentos.
+- `services/courses.py`: helper interno `CourseService.list_degree_courses()` para My courses → Grado, con normalización en `parsers/courses.py`. No agrega una herramienta a Inspector. Uso y estructura de materias en [la guía para recursos](guia-get-course-resources.md).
 - `browser/calendar.py`: lectura del módulo de calendario de Moodle en Lightpanda.
 - `parsers/calendar.py` y `services/calendar.py`: validación del mes, fechas, enlaces y consulta mensual.
 - `tools/`: adaptación de los servicios a MCP, sin parámetros de credenciales.

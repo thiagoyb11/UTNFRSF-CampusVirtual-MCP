@@ -469,7 +469,7 @@ Esquema verificado de `extract`:
 }
 ```
 
-No usar solo el nombre de la sección como identificador: en la segunda materia había dos secciones llamadas “Material”.
+No usar solo el nombre de la sección como identificador: en No SQL se repite “Material” en distintas secciones (tres en la revisión ampliada).
 
 | Identificador | Significado |
 | --- | --- |
@@ -591,3 +591,8 @@ Referencia de parámetros nativos: [herramientas del MCP de Lightpanda](https://
 `list_monthly_activities` aprovecha el bloque mensual observado y consulta los datos estructurados de `core_calendar/repository` desde Lightpanda. El 31 de octubre de 2026 se verificó la llamada MCP contra el campus real: 33 eventos del mes y 13 al filtrar vencimientos/cierres. Se confirmó el contrato del repositorio y se comparó el enlace directo con el popup real. Ver [calendario: extracción, enlaces y validación](calendario.md).
 
 El popup de calendario usa `[data-region="modal-container"][role="dialog"]`, con regiones `modal`, `header`, `title`, `body` y `footer`. El enlace a la actividad está en `[data-region="footer"] a[href]`; debe validarse como una ruta `/mod/<módulo>/view.php?id=<cmid>`. No buscar su texto traducible. Antes de pulsar un evento hay que esperar la carga de los módulos `core_calendar/calendar`, `core_calendar/summary_modal` y `core_calendar/popover`, observados en esta sesión. Hay otros elementos `[role="dialog"]` de notificaciones, por lo que ese selector por sí solo no identifica el popup de una tarea.
+
+
+## Ampliación: Grado y formatos de cuatro materias
+
+La revisión posterior de dos materias de Sistemas y dos Básicas encontró tanto `format-topics` como `format-onetopic`. En este último formato, el DOM inicial solo incluye la sección activa y puede no existir una barra de pestañas. Consultá [la guía para implementar get_course_resources()](guia-get-course-resources.md) para el recorrido por secciones, las carpetas y las restricciones. El helper `CourseService.list_degree_courses()` lista únicamente My courses → Grado; no debe confundirse con el selector general de cursos de la inspección inicial.

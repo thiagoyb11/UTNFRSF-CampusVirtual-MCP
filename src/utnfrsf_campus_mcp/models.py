@@ -28,7 +28,7 @@ class LoginResult(BaseModel):
 
 
 class Course(BaseModel):
-    """Asignatura que el campus vincula al evento."""
+    """Asignatura identificada por su ID, nombre completo y enlace al campus."""
 
     id: int
     name: str

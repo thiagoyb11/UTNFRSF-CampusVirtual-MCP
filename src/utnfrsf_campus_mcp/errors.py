@@ -15,3 +15,11 @@ class CalendarError(Exception):
     def __init__(self, code: str, message: str) -> None:
         self.code = code
         super().__init__(f"{code}: {message}")
+
+
+class CourseError(Exception):
+    """Fallo seguro al identificar o consultar las asignaturas de la cuenta."""
+
+    def __init__(self, code: str, message: str) -> None:
+        self.code = code
+        super().__init__(f"{code}: {message}")
