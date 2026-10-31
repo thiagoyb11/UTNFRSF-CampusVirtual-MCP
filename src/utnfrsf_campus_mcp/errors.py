@@ -23,3 +23,11 @@ class CourseError(Exception):
     def __init__(self, code: str, message: str) -> None:
         self.code = code
         super().__init__(f"{code}: {message}")
+
+
+class DownloadError(Exception):
+    """Fallo seguro de una descarga autenticada o de su destino local."""
+
+    def __init__(self, code: str, message: str) -> None:
+        self.code = code
+        super().__init__(f"{code}: {message}")

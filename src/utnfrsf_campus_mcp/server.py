@@ -15,9 +15,14 @@ from utnfrsf_campus_mcp.browser.session import CampusSession
 from utnfrsf_campus_mcp.config import Settings
 from utnfrsf_campus_mcp.services.authentication import AuthenticationService
 from utnfrsf_campus_mcp.services.calendar import CalendarService
+from utnfrsf_campus_mcp.services.courses import CourseService
+from utnfrsf_campus_mcp.services.downloads import DownloadService
+from utnfrsf_campus_mcp.services.resources import ResourceService
 from utnfrsf_campus_mcp.tools.authentication import register_authentication
 from utnfrsf_campus_mcp.tools.calendar import register_calendar
 from utnfrsf_campus_mcp.tools.diagnostics import register_diagnostics
+from utnfrsf_campus_mcp.tools.downloads import register_downloads
+from utnfrsf_campus_mcp.tools.resources import register_resources
 
 
 def create_server(settings: Settings | None = None) -> MCPServer:
@@ -37,6 +42,10 @@ def create_server(settings: Settings | None = None) -> MCPServer:
     authentication = AuthenticationService(config, session)
     register_authentication(server, authentication)
     register_calendar(server, CalendarService(config, session, authentication))
+    courses = CourseService(config, session, authentication)
+    resources = ResourceService(config, session, courses)
+    register_resources(server, resources)
+    register_downloads(server, DownloadService(resources, session))
     return server
 
 

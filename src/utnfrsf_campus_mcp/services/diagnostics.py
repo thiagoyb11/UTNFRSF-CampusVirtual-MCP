@@ -15,6 +15,8 @@ def get_server_info(settings: Settings) -> ServerInfo:
         timezone=settings.timezone,
         message=(
             "Login y consulta mensual de actividades verificados contra el campus real. "
-            "Descargas y entregas todavía no están implementadas."
+            "get_course_resources lista enlaces por asignatura; se verificó en un curso topics. "
+            "Falta validar onetopic. download_resources descarga archivos del campus; "
+            "las entregas todavía no están implementadas."
         ),
     )

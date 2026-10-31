@@ -30,6 +30,10 @@ Las herramientas disponibles son:
 - **`login`**: inicia o verifica la sesión del campus usando las credenciales privadas de configuración. No recibe argumentos.
 - **`list_monthly_activities`**: devuelve JSON con las actividades del mes, asignaturas, fechas y enlaces directos. Parámetros y ejemplos en [actividades del mes](calendario.md). Verificada contra el campus real el 31 de octubre de 2026: mes actual, mes explícito, filtro de deadlines y enlace del popup.
 
+- **`get_course_resources(course_id)`**: lista enlaces de una materia de Grado, incluidas tareas, PDF/ZIP y archivos de carpetas. Recorre formatos `topics` y `onetopic` y devuelve procedencia y estado de integridad. [Contrato y límites](recursos.md). Pruebas locales completas y validación real en Análisis Numérico (`topics`): 189 enlaces, sin pendientes. Falta validar integralmente `onetopic`.
+
+- **`download_resources(course_id, module_id, urls)`**: descarga de 1 a 10 archivos observados, sin restricción de extensión o MIME del módulo a `downloads/`, valida el transporte y devuelve rutas, tamaños y SHA-256. [Contrato y límites](descargas.md).
+
 ## Configurar el acceso
 
 Si todavía no existe un `.env`, copiá `.env.example` y completá los valores en ese archivo privado:
@@ -97,6 +101,7 @@ La sesión se conserva en memoria durante la ejecución del proceso MCP y se cie
 - `services/courses.py`: helper interno `CourseService.list_degree_courses()` para My courses → Grado, con normalización en `parsers/courses.py`. No agrega una herramienta a Inspector. Uso y estructura de materias en [la guía para recursos](guia-get-course-resources.md).
 - `browser/calendar.py`: lectura del módulo de calendario de Moodle en Lightpanda.
 - `parsers/calendar.py` y `services/calendar.py`: validación del mes, fechas, enlaces y consulta mensual.
+- `browser/resources.py`, `parsers/resources.py` y `services/resources.py`: inventario de enlaces por asignatura y ampliación de páginas de recursos.
 - `tools/`: adaptación de los servicios a MCP, sin parámetros de credenciales.
 
 ## Controles locales

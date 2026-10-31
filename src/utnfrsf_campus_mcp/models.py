@@ -66,3 +66,77 @@ class MonthlyActivities(BaseModel):
     total: int
     activities: list[CalendarActivity]
     warnings: list[str]
+
+
+class CourseSection(BaseModel):
+    """Sección observada, incluso si no tiene enlace habilitado."""
+
+    index: int
+    id: int | None = None
+    name: str | None = None
+    url: str | None = None
+    available: bool = True
+    visited: bool = False
+
+
+class CourseLink(BaseModel):
+    """Enlace con su procedencia; file indica destino, no descarga verificada."""
+
+    name: str
+    url: str
+    kind: Literal["file", "assignment", "folder", "resource", "activity", "external", "link"]
+    section_index: int
+    module_id: int | None = None
+    module_type: str | None = None
+    source_url: str
+
+
+class UnlinkedActivity(BaseModel):
+    """Actividad observada sin un href disponible; nunca se fabrica su URL."""
+
+    module_id: int
+    module_type: str
+    name: str
+    section_index: int
+    availability: str | None = None
+
+
+class CourseResources(BaseModel):
+    """Inventario de enlaces del curso y alcance efectivo de la consulta."""
+
+    course: Course
+    format: Literal["topics", "onetopic"]
+    fetched_at: AwareDatetime
+    total: int
+    links: list[CourseLink]
+    sections: list[CourseSection]
+    unlinked_activities: list[UnlinkedActivity]
+    complete: bool
+    pending_urls: list[str]
+    warnings: list[str]
+
+
+class DownloadedFile(BaseModel):
+    """Archivo completo guardado localmente sin sobrescribir archivos existentes."""
+
+    name: str
+    path: str
+    source_url: str
+    size_bytes: int
+    sha256: str
+    content_type: str
+    downloaded_at: AwareDatetime
+
+
+class DownloadFailure(BaseModel):
+    source_url: str
+    code: str
+    message: str
+
+
+class DownloadedResources(BaseModel):
+    course: Course
+    module_id: int
+    complete: bool
+    files: list[DownloadedFile]
+    failures: list[DownloadFailure]

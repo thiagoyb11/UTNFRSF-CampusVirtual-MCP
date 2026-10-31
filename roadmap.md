@@ -88,13 +88,13 @@ El SDK admite extraer colecciones y atributos mediante selectores. Conviene conv
 
 **Objetivo:** obtener archivos completos desde recursos accesibles para la cuenta.
 
-**Inspección completada:** dos materias específicas de Sistemas y dos Básicas, con formatos `topics` y `onetopic`, navegación de secciones, restricciones y dos carpetas reales. Ver [guía para implementar get_course_resources()](docs/guia-get-course-resources.md). La función y las descargas todavía no están implementadas.
+**Inspección completada:** dos materias específicas de Sistemas y dos Básicas, con formatos `topics` y `onetopic`, navegación de secciones, restricciones y dos carpetas reales. Ver [guía para implementar get_course_resources()](docs/guia-get-course-resources.md). `get_course_resources(course_id)` está implementada y registrada, con recorrido de secciones, enlaces de tareas, ampliación de carpetas y recursos, y respuestas parciales explícitas. Tiene pruebas locales y validación real en Análisis Numérico (`topics`): 189 enlaces, sin pendientes. Falta validar integralmente `onetopic`. La descarga binaria de archivos sin restricción de tipo está implementada como `download_resources`; ver [contrato y límites](docs/descargas.md). Se admiten ZIPs, código, imágenes, audio, PDF y otros formatos sin una lista de tipos permitidos. Ver [contrato y verificación](docs/recursos.md).
 
-1. Implementar `list_course_resources`, recorriendo secciones y carpetas observadas, con filtros por materia o unidad. Diferenciar archivos descargables de páginas y enlaces externos.
+1. Verificar `get_course_resources` en el campus real y evaluar filtros por unidad. Diferenciar archivos descargables de páginas y enlaces externos.
 2. Validar con un recurso de prueba cómo funciona una descarga autenticada. No confundir `html`, `markdown` o `extract` con un mecanismo para obtener archivos binarios.
 3. Comprobar si la versión elegida ofrece una operación adecuada. Si hace falta un cliente HTTP interno, declarar su dependencia y transferir solo las cookies válidas para el origen, comprobando autenticación y redirecciones.
 4. Implementar `download_resource`: limitar tamaño y tiempo, normalizar nombres, impedir escapes del destino y escribir primero a un archivo temporal. Informar la ruta final y el tamaño verificado.
-5. Detectar respuestas de login o error guardadas como supuestos PDFs. Evitar sobrescrituras no solicitadas y eliminar archivos parciales tras fallos.
+5. Detectar respuestas de login o error sin rechazar archivos HTML legítimos. Evitar sobrescrituras no solicitadas y eliminar archivos parciales tras fallos.
 6. Probar con un servidor local archivos binarios, recursos protegidos, redirecciones, nombres repetidos y respuestas interrumpidas. Después verificar un recurso real autorizado.
 
 La [referencia de herramientas de Lightpanda](https://lightpanda.io/docs/reference/mcp-tools) permite descubrir y leer contenido de página; esta etapa debe validar por separado el transporte de archivos del campus.

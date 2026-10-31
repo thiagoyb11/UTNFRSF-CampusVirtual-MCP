@@ -6,8 +6,9 @@ Estas instrucciones se aplican a todo el repositorio. Su propósito es mantener 
 
 - Leé el `README.md` y revisá el árbol y el estado de Git antes de modificar archivos.
 - El objetivo es consultar materias, actividades, vencimientos y calendario, descargar bibliografía y gestionar entregas de trabajos prácticos.
-- La base ejecutable está en `src/utnfrsf_campus_mcp/`. Están registradas `get_server_info`, `login` y `list_monthly_activities`; las demás operaciones académicas se desarrollarán según `roadmap.md`. La consulta mensual se verificó contra el campus real el 31 de octubre de 2026, incluido el filtro de deadlines y el enlace del popup; consultá `docs/calendario.md`. El login ya se verificó con una cuenta autorizada en el campus real. Consultá `docs/desarrollo.md` para ejecutar y verificar el proyecto.
-- Existe el helper interno `CourseService.list_degree_courses()` para My courses → Grado; se verificó con Lightpanda en el campus real. No es una herramienta MCP registrada. Para implementar `get_course_resources()`, leé `docs/guia-get-course-resources.md`: hay materias `topics` y `onetopic`, y estas últimas requieren recorrer secciones.
+- La base ejecutable está en `src/utnfrsf_campus_mcp/`. Están registradas `get_server_info`, `login`, `list_monthly_activities`, `get_course_resources` y `download_resources`; las demás operaciones académicas se desarrollarán según `roadmap.md`. La consulta mensual se verificó contra el campus real el 31 de octubre de 2026, incluido el filtro de deadlines y el enlace del popup; consultá `docs/calendario.md`. El login ya se verificó con una cuenta autorizada en el campus real. Consultá `docs/desarrollo.md` para ejecutar y verificar el proyecto.
+- Existe el helper interno `CourseService.list_degree_courses()` para My courses → Grado; se verificó con Lightpanda en el campus real. No es una herramienta MCP registrada. `get_course_resources(course_id)` ya está implementada; leé `docs/recursos.md` para alcance y verificación, y `docs/guia-get-course-resources.md` para la evidencia previa: hay materias `topics` y `onetopic`, y estas últimas requieren recorrer secciones.
+- `download_resources(course_id, module_id, urls)` descarga archivos observados de cualquier tipo a `downloads/`, con transporte HTTP de la biblioteca estándar y cookies de Lightpanda solo en memoria. Consultá `docs/descargas.md` para validación y límites.
 - Revisá el estado real del código en cada tarea. Implementá por incrementos y actualizá el estado de las funciones cuando haya evidencia de que funcionan.
 - La URL de referencia es `https://campusvirtual.frsf.utn.edu.ar/`. No confundas este campus con SysAcad ni con otros servicios de la facultad.
 - Usá español para la documentación y la comunicación. Usá inglés y `snake_case` para identificadores de Python y nombres de herramientas, siguiendo las convenciones del código existente.
@@ -55,7 +56,7 @@ Estas instrucciones se aplican a todo el repositorio. Su propósito es mantener 
 - Conservá fecha, zona horaria, origen y momento de consulta cuando estén disponibles. Usá datetimes con zona y serialización ISO 8601 para instantes conocidos.
 - Distinguí fecha límite, cierre definitivo y evento de calendario. Respetá las extensiones que el campus muestre para la cuenta; no deduzcas fechas a partir del título de una actividad.
 - Ante una fecha ambigua, devolvé el valor original y la incertidumbre. No inventes un horario o un estado de atraso. Si se aplica la zona configurada como fallback, indicá esa procedencia.
-- Para descargas, validá la sesión, la respuesta, el contenido y el destino. Detectá páginas HTML de login guardadas como supuestos PDFs.
+- Para descargas, validá la sesión, la respuesta, el contenido y el destino. Detectá páginas de login o error del campus y distinguí esas respuestas de archivos HTML legítimos.
 - Normalizá nombres y rutas, impedí escapes del directorio de destino y evitá sobrescribir archivos sin autorización. Limpiá descargas parciales fallidas.
 - Para cargas, verificá archivos locales, tamaños y tipos admitidos antes de modificar el campus. No adjuntes archivos adicionales a los pedidos por el usuario.
 

@@ -4,9 +4,13 @@ Un servidor MCP para conectar asistentes de inteligencia artificial con el [Camp
 
 Su objetivo es facilitar las tareas cotidianas del estudiante desde un asistente, usando su cuenta del campus.
 
-> Proyecto en desarrollo. Incluye inicio de sesión y consulta mensual de actividades; las entregas siguen en implementación.
+> Proyecto en desarrollo. Incluye inicio de sesión, consulta mensual de actividades y listado de enlaces por asignatura; las entregas siguen en implementación.
 
 `login()` usa las credenciales del `.env` privado. `list_monthly_activities()` devuelve JSON con las fechas, horarios, asignaturas y enlaces directos de las actividades del calendario. Podés probarlas en Inspector siguiendo la [guía de desarrollo](docs/desarrollo.md). Los parámetros y ejemplos de la consulta mensual están en [su guía](docs/calendario.md).
+
+`get_course_resources(course_id)` lista los enlaces de una materia, incluidas tareas, archivos y materiales de carpetas. Recorre secciones y devuelve el alcance de la consulta. Ver [uso y límites](docs/recursos.md); verificada en Análisis Numérico (`topics`); queda pendiente la validación integral de `onetopic`.
+
+`download_resources(course_id, module_id, urls)` descarga archivos de cualquier tipo del módulo indicado a `downloads/`, valida la transferencia y devuelve rutas, tamaños y hashes. Ver [uso y límites](docs/descargas.md).
 
 ## Funciones previstas
 

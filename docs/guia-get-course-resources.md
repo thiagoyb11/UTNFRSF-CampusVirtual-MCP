@@ -2,7 +2,7 @@
 
 Inspección del **31 de octubre de 2026** sobre el campus real, con Lightpanda 1.0.2 y la cuenta autorizada de `.env`. Se revisaron **cuatro materias: dos específicas de Sistemas y dos básicas**, siguiendo la distribución solicitada. Este documento complementa [estructura-campus.md](estructura-campus.md): las observaciones anteriores de `topics` no se pueden generalizar a todas las materias.
 
-Está implementado el helper interno `CourseService.list_degree_courses()`. **`get_course_resources()` todavía no está implementada ni registrada como herramienta MCP.** La inspección consultó páginas, pestañas y carpetas; no descargó bibliografía ni modificó entregas, grupos o inscripciones.
+Está implementado el helper interno `CourseService.list_degree_courses()`. **Estado actualizado:** `get_course_resources(course_id)` ya está implementada y registrada; consultá [contrato, alcance y verificación](recursos.md). Esta guía conserva la evidencia de la inspección previa. La inspección consultó páginas, pestañas y carpetas; no descargó bibliografía ni modificó entregas, grupos o inscripciones.
 
 ## 1. Helper para My courses → Grado
 
@@ -255,7 +255,7 @@ Una primera respuesta útil puede incluir: `course`, `section_index`, `section_i
 
 ### Límites de esta evidencia
 
-- No se implementó `get_course_resources()` ni se descargaron archivos binarios.
+- Esta inspección previa no implementó `get_course_resources()` ni descargó archivos binarios. La implementación posterior está descrita en [recursos.md](recursos.md).
 - No se siguieron los destinos externos de `mod_url` ni se inspeccionaron adjuntos de tareas, cuestionarios, foros, páginas o libros.
 - No se recorrieron todas las pestañas de las materias básicas ni carpetas arbitrarias; las cantidades de la muestra están delimitadas arriba.
 - No se forzaron pestañas deshabilitadas ni accesos restringidos por grupo.
