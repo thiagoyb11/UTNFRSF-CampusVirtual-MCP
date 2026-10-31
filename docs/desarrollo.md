@@ -34,6 +34,11 @@ Las herramientas disponibles son:
 
 - **`download_resources(course_id, module_id, urls)`**: descarga de 1 a 10 archivos observados, sin restricción de extensión o MIME del módulo a `downloads/`, valida el transporte y devuelve rutas, tamaños y SHA-256. [Contrato y límites](descargas.md).
 
+- **`get_submission_status(course_id, activity_id)`**: consulta estado y archivos de una tarea.
+- **`prepare_submission(course_id, activity_id, files)`**: preparación local sin sesión ni escrituras remotas.
+- **`upload_files(course_id, activity_id, files)`**: carga temporal con comprobación de bytes y recibo privado en memoria.
+- **`submit_assignment(upload_id, finalize, accept_statement)`**: guarda la carga y, si se solicita, completa la confirmación final. Guardar puede entregar directamente en cursos sin borradores. Carga y guardado verificados mediante MCP en el TP 6 real con autorización explícita. [Contrato, límites y estado de verificación](entregas.md).
+
 ## Configurar el acceso
 
 Si todavía no existe un `.env`, copiá `.env.example` y completá los valores en ese archivo privado:
@@ -102,6 +107,7 @@ La sesión se conserva en memoria durante la ejecución del proceso MCP y se cie
 - `browser/calendar.py`: lectura del módulo de calendario de Moodle en Lightpanda.
 - `parsers/calendar.py` y `services/calendar.py`: validación del mes, fechas, enlaces y consulta mensual.
 - `browser/resources.py`, `parsers/resources.py` y `services/resources.py`: inventario de enlaces por asignatura y ampliación de páginas de recursos.
+- `parsers/submissions.py`, `browser/uploads.py`, `browser/file_input.py` y `services/submissions.py`: preparación, carga temporal y entrega de tareas.
 - `tools/`: adaptación de los servicios a MCP, sin parámetros de credenciales.
 
 ## Controles locales

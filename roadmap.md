@@ -103,6 +103,8 @@ La [referencia de herramientas de Lightpanda](https://lightpanda.io/docs/referen
 
 ## 6. Consultar entregas y preparar archivos localmente
 
+**Avance:** `get_submission_status` y `prepare_submission` implementadas y registradas. La preparación no realiza peticiones al campus. Inspección real del TP 6 y límites documentados en [entregas](docs/entregas.md).
+
 **Objetivo:** conocer el estado de un TP y construir una preparación verificable sin modificar el campus.
 
 1. Inspeccionar una actividad de prueba y sus estados: sin entrega, borrador, enviado o cualquier variante que realmente muestre la plataforma.
@@ -114,6 +116,8 @@ La [referencia de herramientas de Lightpanda](https://lightpanda.io/docs/referen
 **Criterio de cierre:** la preparación describe exactamente qué se enviaría, detecta cambios de archivos o destino y no produce escrituras remotas.
 
 ## 7. Validar la carga y ejecutar entregas
+
+**Avance:** helper `FileUploadHelper.upload_files(files)`, herramientas `upload_files` y `submit_assignment` implementadas. La carga, guardado y estado final submitted se verificaron mediante MCP con un archivo sintético en el TP 6 real, por autorización explícita del usuario. El archivo final se comprobó por tamaño y SHA-256. Tras HTTP 429 durante el diagnóstico, una carga única posterior a una pausa de 90 segundos funcionó; no se reintentan POSTs automáticamente. Borradores, confirmación adicional y respuestas inciertas se probaron con fixtures. Falta ampliar la verificación a otras configuraciones de tareas y módulos. Ver [contrato y verificación](docs/entregas.md).
 
 **Objetivo:** entregar un trabajo solicitado y comprobar el resultado sin duplicarlo.
 

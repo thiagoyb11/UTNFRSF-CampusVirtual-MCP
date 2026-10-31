@@ -140,3 +140,58 @@ class DownloadedResources(BaseModel):
     complete: bool
     files: list[DownloadedFile]
     failures: list[DownloadFailure]
+
+
+class LocalSubmissionFile(BaseModel):
+    path: str
+    name: str
+    size_bytes: int
+    sha256: str
+
+
+class PreparedSubmission(BaseModel):
+    course_id: int
+    activity_id: int
+    files: list[LocalSubmissionFile]
+
+
+class SubmissionFile(BaseModel):
+    name: str
+    url: str
+
+
+class SubmissionStatus(BaseModel):
+    course_id: int
+    activity_id: int
+    name: str
+    source_url: str
+    state: Literal["new", "draft", "submitted", "reopened", "unknown"]
+    can_edit: bool
+    files: list[SubmissionFile]
+    evidence: list[str]
+
+
+class UploadLimits(BaseModel):
+    max_files: int
+    max_file_bytes: int
+    max_area_bytes: int
+    accepted_types: list[str]
+
+
+class UploadedFiles(BaseModel):
+    upload_id: str
+    stage: Literal["temporary"] = "temporary"
+    course_id: int
+    activity_id: int
+    files: list[LocalSubmissionFile]
+    limits: UploadLimits
+    verified: bool = True
+    message: str = "Archivos verificados en el área temporal; la entrega no se guardó."
+
+
+class SubmissionResult(BaseModel):
+    upload_id: str
+    stage: Literal["saved", "submitted", "uncertain"]
+    status: SubmissionStatus | None
+    files_verified: bool
+    message: str

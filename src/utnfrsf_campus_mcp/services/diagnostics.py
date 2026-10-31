@@ -17,6 +17,7 @@ def get_server_info(settings: Settings) -> ServerInfo:
             "Login y consulta mensual de actividades verificados contra el campus real. "
             "get_course_resources lista enlaces por asignatura; se verificó en un curso topics. "
             "Falta validar onetopic. download_resources descarga archivos del campus; "
-            "las entregas todavía no están implementadas."
+            "upload_files y submit_assignment se verificaron mediante MCP en el TP 6 real, "
+            "con estado enviado y bytes comprobados. Otros módulos siguen pendientes."
         ),
     )
