@@ -14,7 +14,9 @@ from utnfrsf_campus_mcp.browser.lightpanda import LightpandaBrowser
 from utnfrsf_campus_mcp.browser.session import CampusSession
 from utnfrsf_campus_mcp.config import Settings
 from utnfrsf_campus_mcp.services.authentication import AuthenticationService
+from utnfrsf_campus_mcp.services.calendar import CalendarService
 from utnfrsf_campus_mcp.tools.authentication import register_authentication
+from utnfrsf_campus_mcp.tools.calendar import register_calendar
 from utnfrsf_campus_mcp.tools.diagnostics import register_diagnostics
 
 
@@ -32,7 +34,9 @@ def create_server(settings: Settings | None = None) -> MCPServer:
 
     server = MCPServer("UTN FRSF Campus Virtual MCP", lifespan=lifespan)
     register_diagnostics(server, config)
-    register_authentication(server, AuthenticationService(config, session))
+    authentication = AuthenticationService(config, session)
+    register_authentication(server, authentication)
+    register_calendar(server, CalendarService(config, session, authentication))
     return server
 
 

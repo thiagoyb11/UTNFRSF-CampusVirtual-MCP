@@ -117,7 +117,7 @@ class AuthenticationService:
 
         form = select_login_form(await page.detect_forms(), self._login_url)
         form_selector = await self._selector(page, form.form_id)
-        buttons = await page.find_element(role="button", name="Acceder")
+        buttons = await page.find_element(role="button")
         matching = []
         for button in buttons:
             node_id = button.get("backendNodeId")
@@ -190,7 +190,6 @@ class AuthenticationService:
             )
         return state
 
-
     @staticmethod
     async def _selector(page: AsyncSession, node_id: int) -> str:
         details = await page.node_details(backend_node_id=node_id)
@@ -207,7 +206,10 @@ class AuthenticationService:
             const form = document.querySelector({json.dumps(form)});
             const button = document.querySelector({json.dumps(button)});
             const expected = new URL({json.dumps(self._login_url)});
-            if (!form || !button || !form.contains(button)) return false;
+            if (!form || !button || !form.contains(button) || button.disabled) return false;
+            const isSubmit = button.matches('button, input[type="submit"]') &&
+                (button.getAttribute('type') || 'submit').toLowerCase() === 'submit';
+            if (!isSubmit) return false;
             const action = new URL(form.getAttribute('action') || location.href, location.href);
             const override = button.getAttribute('formaction');
             return location.origin === expected.origin &&

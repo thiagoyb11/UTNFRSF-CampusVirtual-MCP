@@ -7,3 +7,11 @@ class LoginError(Exception):
     def __init__(self, code: str, message: str) -> None:
         self.code = code
         super().__init__(f"{code}: {message}")
+
+
+class CalendarError(Exception):
+    """Error de consulta con código y mensaje aptos para el cliente MCP."""
+
+    def __init__(self, code: str, message: str) -> None:
+        self.code = code
+        super().__init__(f"{code}: {message}")

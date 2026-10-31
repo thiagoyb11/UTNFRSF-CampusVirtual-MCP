@@ -28,6 +28,7 @@ Las herramientas disponibles son:
 
 - **`get_server_info`**: informa versión y alcance, sin abrir el navegador.
 - **`login`**: inicia o verifica la sesión del campus usando las credenciales privadas de configuración. No recibe argumentos.
+- **`list_monthly_activities`**: devuelve JSON con las actividades del mes, asignaturas, fechas y enlaces directos. Parámetros y ejemplos en [actividades del mes](calendario.md). Verificada contra el campus real el 31 de octubre de 2026: mes actual, mes explícito, filtro de deadlines y enlace del popup.
 
 ## Configurar el acceso
 
@@ -74,7 +75,7 @@ Una respuesta confirmada tiene esta forma:
 }
 ```
 
-`login` navega a la página de acceso, usa `detect_forms`, encuentra el botón con `find_element`, completa los campos con `fill` y envía con `click`. Los nombres `username` y `password`, los selectores y el destino del formulario se comprobaron en el campus público con Lightpanda. Se verifica un identificador de usuario autenticado en la configuración de la página y la ausencia del formulario de login; no se declara éxito solo por un HTTP 200.
+`login` navega a la página de acceso, usa `detect_forms`, encuentra con `find_element` el botón submit perteneciente al formulario, sin buscar su texto traducido, completa los campos con `fill` y envía con `click`. Los nombres `username` y `password`, los selectores y el destino del formulario se comprobaron en el campus público con Lightpanda. Se verifica un identificador de usuario autenticado en la configuración de la página y la ausencia del formulario de login; no se declara éxito solo por un HTTP 200.
 
 Ante HTTP 429, un error `TooManyRequests` o una página con ese mensaje, espera y vuelve a la página de login para descubrir un formulario nuevo. No reenvía a ciegas el POST anterior. Las credenciales rechazadas y los resultados inciertos no se reintentan automáticamente. Los fallos se devuelven como errores MCP con códigos como `LOGIN_CREDENTIALS_MISSING`, `LOGIN_RATE_LIMITED` o `LOGIN_REJECTED`, sin incluir mensajes crudos del navegador.
 
@@ -93,6 +94,8 @@ La sesión se conserva en memoria durante la ejecución del proceso MCP y se cie
 - `browser/`: adaptador de Lightpanda y sesión compartida con acceso serializado.
 - `parsers/login.py`: identificación del formulario y señales de estado de la página.
 - `services/authentication.py`: flujo de acceso y política de reintentos.
+- `browser/calendar.py`: lectura del módulo de calendario de Moodle en Lightpanda.
+- `parsers/calendar.py` y `services/calendar.py`: validación del mes, fechas, enlaces y consulta mensual.
 - `tools/`: adaptación de los servicios a MCP, sin parámetros de credenciales.
 
 ## Controles locales

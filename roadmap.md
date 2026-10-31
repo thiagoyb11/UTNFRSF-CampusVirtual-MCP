@@ -14,7 +14,9 @@ La referencia inicial es **Lightpanda 1.0.2**, con el SDK oficial de Python, y *
 - [x] Inspección del formulario público con Lightpanda.
 - [x] Login verificado contra el campus real con credenciales en `.env`.
 - [x] Sesión compartida en memoria y reintentos acotados para `TooManyRequests`.
-- [ ] Consultas y demás operaciones académicas sobre el campus real.
+- [x] Consulta `list_monthly_activities` implementada y probada localmente, con fechas y enlaces directos independientes del idioma.
+- [x] Consulta mensual validada contra el campus real: mes actual y explícito, filtro de deadlines y enlace directo cotejado con el popup.
+- [ ] Implementar y verificar las demás operaciones académicas sobre el campus real.
 
 El servidor no registra herramientas académicas ficticias. Se irán incorporando al completar las etapas correspondientes. Las instrucciones para instalar y verificar la base están en [docs/desarrollo.md](docs/desarrollo.md).
 
@@ -67,6 +69,8 @@ El SDK admite extraer colecciones y atributos mediante selectores. Conviene conv
 ## 4. Consultar actividades, vencimientos y calendario
 
 **Objetivo:** responder qué hay que hacer y cuándo.
+
+**Avance:** `list_monthly_activities(year, month, deadlines_only)` está registrada. Usa Lightpanda y el repositorio del calendario de Moodle para obtener fechas exactas, asignaturas y enlaces directos. Hay pruebas locales de límites del mes, intervalos, duplicados, idioma, sesión y errores; el 31 de octubre de 2026 se verificó en el campus real la llamada MCP, el mes actual, el filtro de deadlines y la coincidencia del enlace directo con el popup. Ver [contrato y alcance](docs/calendario.md).
 
 1. Inspeccionar las actividades de una materia y las vistas de calendario disponibles para la cuenta. Verificar qué tipos de actividad se pueden interpretar; señalar los todavía no soportados.
 2. Incorporar modelos de actividad, fecha límite y evento. Mantener identificador de materia, URL de origen y momento de consulta.

@@ -4,9 +4,9 @@ Un servidor MCP para conectar asistentes de inteligencia artificial con el [Camp
 
 Su objetivo es facilitar las tareas cotidianas del estudiante desde un asistente, usando su cuenta del campus.
 
-> Proyecto en desarrollo. El inicio de sesión ya está disponible; las consultas y entregas siguen en implementación.
+> Proyecto en desarrollo. Incluye inicio de sesión y consulta mensual de actividades; las entregas siguen en implementación.
 
-La herramienta `login()` usa el usuario y la contraseña configurados en el `.env` privado. Podés probarla desde un cliente MCP como Inspector; las instrucciones están en la [guía de desarrollo](docs/desarrollo.md).
+`login()` usa las credenciales del `.env` privado. `list_monthly_activities()` devuelve JSON con las fechas, horarios, asignaturas y enlaces directos de las actividades del calendario. Podés probarlas en Inspector siguiendo la [guía de desarrollo](docs/desarrollo.md). Los parámetros y ejemplos de la consulta mensual están en [su guía](docs/calendario.md).
 
 ## Funciones previstas
 
