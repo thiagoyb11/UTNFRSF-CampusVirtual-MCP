@@ -6,7 +6,7 @@ Estas instrucciones se aplican a todo el repositorio. Su propósito es mantener 
 
 - Leé el `README.md` y revisá el árbol y el estado de Git antes de modificar archivos.
 - El objetivo es consultar materias, actividades, vencimientos y calendario, descargar bibliografía y gestionar entregas de trabajos prácticos.
-- La base inicial es documental. No des por existentes el paquete, los módulos, las herramientas ni los comandos que el README presenta como propuestos.
+- La base ejecutable está en `src/utnfrsf_campus_mcp/`. Solo se registra `get_server_info`; las operaciones académicas se desarrollarán según `roadmap.md`. Consultá `docs/desarrollo.md` para ejecutar y verificar el proyecto.
 - Revisá el estado real del código en cada tarea. Implementá por incrementos y actualizá el estado de las funciones cuando haya evidencia de que funcionan.
 - La URL de referencia es `https://campusvirtual.frsf.utn.edu.ar/`. No confundas este campus con SysAcad ni con otros servicios de la facultad.
 - Usá español para la documentación y la comunicación. Usá inglés y `snake_case` para identificadores de Python y nombres de herramientas, siguiendo las convenciones del código existente.
@@ -69,10 +69,11 @@ Estas instrucciones se aplican a todo el repositorio. Su propósito es mantener 
 
 ## Verificación y mantenimiento
 
+- Por preferencia del proyecto, `tests/`, `scripts/test.sh` y los archivos del editor se mantienen locales e ignorados por Git. No los agregues con `git add -f`. Pueden no existir en un clon nuevo; verificá su disponibilidad antes de usarlos.
 - Antes de ejecutar comandos, verificá cuáles existen en `pyproject.toml`, scripts o CI. No presentes comandos futuros como si ya estuvieran disponibles.
 - Cuando se incorpore código, usá pytest para pruebas y Ruff para lint y formato, salvo que el repositorio haya adoptado otra configuración explícita. Documentá los comandos reales al agregarlos.
 - Probá comportamiento: paginación, cambios de sesión, fechas, selección de actividad, descargas inválidas y resultados inciertos de escritura. Usá fixtures y dobles del adaptador; evitá pruebas que solo repitan la implementación.
 - Las integraciones contra el campus serán optativas. Las pruebas de escritura requieren un entorno o una actividad de prueba y autorización concreta; nunca deben ejecutarse por defecto.
 - Un cambio solo documental requiere revisar coherencia, enlaces locales y `git diff --check`; no necesita pruebas de red con la cuenta del usuario.
-- Actualizá README, hoja de ruta y ejemplos cuando cambien las capacidades, configuración o herramientas. Diferenciá pruebas locales de comprobaciones hechas contra el campus real.
+- Mantené el README breve y orientado al usuario. Documentá implementación y comandos en `docs/desarrollo.md`, y pasos pendientes en `roadmap.md`. Diferenciá pruebas locales de comprobaciones hechas contra el campus real.
 - No modifiques la licencia ni atribuyas respaldo oficial de la UTN. Conservá los cambios ajenos y no hagas commit o push salvo que la tarea lo autorice.

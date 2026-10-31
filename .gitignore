@@ -223,3 +223,10 @@ __marimo__/
 
 # Campus MCP: private sessions, cache and diagnostics
 /.local/
+
+# Local development and verification
+/tests/
+/scripts/test.sh
+/.vscode/
+/.idea/
+.DS_Store

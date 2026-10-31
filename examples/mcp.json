@@ -1,0 +1,14 @@
+{
+  "mcpServers": {
+    "utnfrsf-campus": {
+      "command": "uv",
+      "args": [
+        "--directory",
+        "/ruta/absoluta/UTNFRSF-CampusVirtual-MCP",
+        "run",
+        "--locked",
+        "utnfrsf-campus-mcp"
+      ]
+    }
+  }
+}

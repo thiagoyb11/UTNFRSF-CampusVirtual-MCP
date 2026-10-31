@@ -4,7 +4,7 @@ Un servidor MCP para conectar asistentes de inteligencia artificial con el [Camp
 
 Su objetivo es facilitar las tareas cotidianas del estudiante desde un asistente, usando su cuenta del campus.
 
-> Proyecto en desarrollo. Las funcionalidades todavía no están disponibles.
+> Proyecto en desarrollo. La base del servidor está disponible; las funciones del campus todavía no están implementadas.
 
 ## Funciones previstas
 
@@ -20,6 +20,28 @@ El asistente recibe un pedido en lenguaje natural, como “¿qué trabajos vence
 El servidor utiliza [Lightpanda](https://lightpanda.io/), un navegador que funciona en segundo plano, para acceder al campus, consultar información o realizar la acción solicitada. Luego devuelve el resultado al asistente.
 
 El acceso se limita a las materias y recursos disponibles para la cuenta del estudiante.
+
+## Estructura
+
+```text
+src/utnfrsf_campus_mcp/
+├── server.py       # Arranque del servidor MCP.
+├── config.py       # Configuración desde .env y variables de entorno.
+├── models.py       # Modelos de datos.
+├── browser/        # Integración con Lightpanda.
+├── parsers/        # Extracción de información del campus.
+├── services/       # Lógica de las funcionalidades.
+└── tools/          # Herramientas expuestas al asistente.
+docs/               # Documentación de desarrollo.
+examples/           # Ejemplos de configuración MCP.
+.env.example        # Plantilla de configuración local.
+pyproject.toml      # Paquete y dependencias.
+uv.lock             # Versiones de dependencias.
+roadmap.md          # Plan de implementación.
+AGENTS.md           # Guía para agentes de desarrollo.
+```
+
+Documentación técnica: [desarrollo local](docs/desarrollo.md) · [roadmap](roadmap.md).
 
 ## Licencia
 
