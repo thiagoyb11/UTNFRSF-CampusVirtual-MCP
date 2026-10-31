@@ -1,103 +1,114 @@
-# Desarrollo local
+# Desarrollo y ejecución
 
-## Requisitos
+## Python global
 
-- [uv](https://docs.astral.sh/uv/getting-started/installation/).
-- Python 3.11 o posterior. `.python-version` selecciona Python 3.12 para el entorno de desarrollo; uv puede descargarlo si falta.
-- Una plataforma con wheel de Lightpanda compatible. Para la versión bloqueada hay paquetes para macOS y Linux; en Windows se necesita un entorno Linux compatible, como WSL.
+El proyecto usa Python global 3.11 o posterior. No se crea un entorno virtual. En esta computadora, usá `/opt/homebrew/bin/python3` (Python 3.15); `/usr/bin/python3` es 3.9 y no es compatible.
 
-El paquete `lightpanda` incluye su navegador. No hace falta instalar Chromium ni ejecutar un servidor CDP separado para esta base. También se puede seleccionar un binario compatible mediante `UTN_CAMPUS_LIGHTPANDA_BINARY`. Ver la [guía de Python de Lightpanda](https://lightpanda.io/docs/guides/use-python).
-
-## Instalar y ejecutar
-
-Desde la raíz del repositorio:
+Desde la raíz del repositorio, la instalación para este macOS con Homebrew es:
 
 ```bash
-uv sync --locked --dev
-uv run --locked utnfrsf-campus-mcp --help
-uv run --locked utnfrsf-campus-mcp --version
+/opt/homebrew/bin/python3 -m pip install --user --break-system-packages -e . --group dev
 ```
 
-Para iniciar el servidor:
+Los paquetes quedan disponibles para el intérprete global en la instalación del usuario. `--group dev` incorpora las herramientas de desarrollo; se puede omitir para instalar solo el MCP. En otros sistemas, usá el ejecutable global compatible y las opciones de pip correspondientes.
+
+Lightpanda incluye su navegador en el paquete de Python. No hace falta instalar Chromium ni levantar un servidor CDP separado. Ver la [guía del SDK de Python](https://lightpanda.io/docs/guides/use-python).
+
+## Ejecutar el MCP
 
 ```bash
-uv run --locked utnfrsf-campus-mcp
+/opt/homebrew/bin/python3 -m utnfrsf_campus_mcp --help
+/opt/homebrew/bin/python3 -m utnfrsf_campus_mcp --version
+/opt/homebrew/bin/python3 -m utnfrsf_campus_mcp
 ```
 
-Este comando espera mensajes MCP en stdin y devuelve el protocolo en stdout. No abre un chat ni una ventana de navegador. Los logs van a stderr. También está disponible `uv run --locked python -m utnfrsf_campus_mcp`.
+El último comando espera mensajes MCP en stdin y escribe el protocolo en stdout. Los logs van a stderr. No abre un chat ni una ventana de navegador.
 
-La única herramienta registrada es **`get_server_info`**: devuelve la versión y aclara que las operaciones del campus todavía no están disponibles. No inicia Lightpanda, no autentica una cuenta y no realiza peticiones al campus.
+Las herramientas disponibles son:
 
-## Configuración
+- **`get_server_info`**: informa versión y alcance, sin abrir el navegador.
+- **`login`**: inicia o verifica la sesión del campus usando las credenciales privadas de configuración. No recibe argumentos.
 
-La configuración es opcional. Los valores predeterminados permiten arrancar sin `.env`.
+## Configurar el acceso
 
-```bash
-cp .env.example .env
+Si todavía no existe un `.env`, copiá `.env.example` y completá los valores en ese archivo privado:
+
+```dotenv
+UTN_CAMPUS_USERNAME=
+UTN_CAMPUS_PASSWORD=
 ```
 
-El archivo se lee desde el directorio de trabajo. Las variables de entorno tienen prioridad sobre `.env`.
+No sobrescribas un `.env` existente ni guardes las credenciales en archivos versionados. `.env` está ignorado por Git. Se lee desde el directorio de trabajo y las variables de entorno tienen prioridad. Reiniciá el servidor si cambiás la configuración.
 
 | Variable | Valor inicial | Uso |
 | --- | --- | --- |
-| `UTN_CAMPUS_TIMEZONE` | `America/Argentina/Cordoba` | Zona horaria IANA para el proyecto. |
+| `UTN_CAMPUS_USERNAME` | Vacío | Usuario del campus, mantenido fuera del esquema MCP. |
+| `UTN_CAMPUS_PASSWORD` | Vacío | Contraseña, excluida de representaciones y respuestas. |
+| `UTN_CAMPUS_TIMEZONE` | `America/Argentina/Cordoba` | Zona horaria IANA. |
 | `UTN_CAMPUS_LOG_LEVEL` | `INFO` | Nivel de logging, en mayúsculas. |
 | `UTN_CAMPUS_BROWSER_TIMEOUT_SECONDS` | `30` | Espera de respuesta del proceso Lightpanda. |
-| `UTN_CAMPUS_NAVIGATION_TIMEOUT_MS` | `10000` | Límite previsto para llamadas de navegación; la prueba local ya lo utiliza. |
-| `UTN_CAMPUS_LIGHTPANDA_BINARY` | Sin valor | Ruta opcional al navegador; normalmente se usa el binario del paquete. |
+| `UTN_CAMPUS_NAVIGATION_TIMEOUT_MS` | `10000` | Espera de navegación y resolución del acceso. |
+| `UTN_CAMPUS_LOGIN_MAX_ATTEMPTS` | `3` | Total máximo de intentos; solo se repite ante límites de solicitudes. |
+| `UTN_CAMPUS_LOGIN_RETRY_DELAY_SECONDS` | `2` | Espera inicial, con crecimiento exponencial y variación aleatoria. |
+| `UTN_CAMPUS_LOGIN_TIMEOUT_SECONDS` | `90` | Presupuesto total del login, incluidas las esperas. |
+| `UTN_CAMPUS_LIGHTPANDA_BINARY` | Sin valor | Ruta opcional a otro binario compatible. |
 
-Todavía no hay variables de usuario o contraseña porque el login no está implementado. No guardes secretos en el ejemplo ni en archivos versionados.
+## Probar en Inspector
 
-## Conectar un host MCP
+Desde la raíz del proyecto:
 
-[examples/mcp.json](../examples/mcp.json) contiene un ejemplo para hosts que utilizan la configuración `mcpServers` con `command` y `args`. Reemplazá la ruta del proyecto y, si el host no encuentra `uv`, usá la ruta absoluta de su ejecutable.
-
-Primero ejecutá `uv sync --locked --dev`. Luego incorporá la configuración según las instrucciones de tu host. No ejecutes `lightpanda mcp` en lugar del comando del proyecto: eso expondría el MCP genérico de Lightpanda.
-
-## Estructura
-
-```text
-src/utnfrsf_campus_mcp/
-├── server.py             # Construcción del servidor y entrypoint stdio.
-├── config.py             # Configuración validada.
-├── models.py             # Respuestas tipadas implementadas.
-├── tools/diagnostics.py  # Registro de get_server_info.
-├── services/diagnostics.py
-├── browser/lightpanda.py # Sesiones y ciclo de vida del navegador.
-└── parsers/              # Espacio para extracción y normalización futuras.
-tests/
-├── fixtures/             # HTML sintético, sin datos del campus.
-└── integration/          # Pruebas optativas con Lightpanda real.
+```bash
+npx --yes @modelcontextprotocol/inspector /opt/homebrew/bin/python3 -m utnfrsf_campus_mcp
 ```
 
-El adaptador abre una sesión aislada por bloque y la cierra junto con el proceso. No conserva autenticación entre operaciones. El gestor de sesión autenticada se desarrollará en el [roadmap](../roadmap.md).
+Conectate, abrí **Tools**, seleccioná **login** y ejecutalo sin parámetros (`{}`). No introduzcas las credenciales en los argumentos de Inspector.
 
-## Verificación
+Una respuesta confirmada tiene esta forma:
 
-Los tests y `scripts/test.sh` se mantienen como archivos locales, excluidos de Git. Los comandos de pruebas de esta sección requieren que esos archivos estén presentes; no se incluyen en un clon nuevo. Los controles de Ruff sí se pueden ejecutar sobre el código versionado.
+```json
+{
+  "status": "authenticated",
+  "already_authenticated": false,
+  "attempts": 1,
+  "message": "Sesión autenticada en el campus."
+}
+```
+
+`login` navega a la página de acceso, usa `detect_forms`, encuentra el botón con `find_element`, completa los campos con `fill` y envía con `click`. Los nombres `username` y `password`, los selectores y el destino del formulario se comprobaron en el campus público con Lightpanda. Se verifica un identificador de usuario autenticado en la configuración de la página y la ausencia del formulario de login; no se declara éxito solo por un HTTP 200.
+
+Ante HTTP 429, un error `TooManyRequests` o una página con ese mensaje, espera y vuelve a la página de login para descubrir un formulario nuevo. No reenvía a ciegas el POST anterior. Las credenciales rechazadas y los resultados inciertos no se reintentan automáticamente. Los fallos se devuelven como errores MCP con códigos como `LOGIN_CREDENTIALS_MISSING`, `LOGIN_RATE_LIMITED` o `LOGIN_REJECTED`, sin incluir mensajes crudos del navegador.
+
+La sesión se conserva en memoria durante la ejecución del proceso MCP y se cierra cuando el servidor termina. No se persisten cookies en disco. Una redirección externa o un paso interactivo no soportado produce un error explícito.
+
+**Validación real:** el login se ejecutó mediante la herramienta MCP contra el Campus Virtual UTN FRSF el 31 de octubre de 2026 y confirmó una sesión autenticada en el primer intento. No se registraron las credenciales ni se realizaron otras acciones académicas.
+
+## Conectar otro host MCP
+
+[examples/mcp.json](../examples/mcp.json) usa el formato `mcpServers`. Ajustá `cwd` a la ruta absoluta del proyecto y `command` al Python global compatible de tu sistema. El directorio de trabajo determina qué `.env` se carga.
+
+## Organización
+
+- `server.py`: registro de herramientas y cierre de recursos con el ciclo de vida del servidor.
+- `config.py` y `models.py`: configuración privada y respuestas públicas tipadas.
+- `browser/`: adaptador de Lightpanda y sesión compartida con acceso serializado.
+- `parsers/login.py`: identificación del formulario y señales de estado de la página.
+- `services/authentication.py`: flujo de acceso y política de reintentos.
+- `tools/`: adaptación de los servicios a MCP, sin parámetros de credenciales.
+
+## Controles locales
+
+Los tests y `scripts/test.sh` son archivos locales ignorados por Git. No están incluidos en un clon nuevo. Cuando estén disponibles, usan el intérprete global:
 
 ```bash
 bash scripts/test.sh
-```
-
-El script sincroniza el entorno con el lockfile y ejecuta Ruff, la comprobación de formato y pytest. Las pruebas habituales verifican configuración, descubrimiento de herramientas y llamadas MCP, incluido el transporte stdio real.
-
-Para incluir la integración con Lightpanda:
-
-```bash
 bash scripts/test.sh --with-lightpanda
 ```
 
-La integración levanta una página de prueba en `127.0.0.1` y comprueba JavaScript, extracción y un formulario. No usa cuentas ni se conecta al campus. Pasar esta prueba no acredita compatibilidad con el sitio real.
-
-También podés ejecutar los controles individualmente:
+Los controles de código se pueden ejecutar directamente:
 
 ```bash
-uv run --locked ruff check .
-uv run --locked ruff format --check .
-uv run --locked pytest
+/opt/homebrew/bin/python3 -m ruff check .
+/opt/homebrew/bin/python3 -m ruff format --check .
 ```
 
-Para regenerar el lockfile después de modificar dependencias, usá `uv lock` y volvé a ejecutar los controles. `uv.lock` se versiona; `.venv/`, `.local/`, `.env` y `downloads/` quedan fuera de Git.
-
-Si el entorno no permite escribir en la caché global de uv, definí `UV_CACHE_DIR` con una ruta escribible. El script de verificación ya usa `.local/uv-cache` como alternativa predeterminada.
+`pyproject.toml` declara las dependencias y `uv.lock` conserva su resolución. Se puede actualizar el lockfile con `uv lock --python /opt/homebrew/bin/python3`; este comando no crea un entorno virtual. No uses `uv sync` ni `uv run` en este proyecto.

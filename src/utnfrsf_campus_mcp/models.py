@@ -10,9 +10,18 @@ class ServerInfo(BaseModel):
 
     name: str
     version: str
-    stage: Literal["bootstrap"] = "bootstrap"
+    stage: Literal["authentication"] = "authentication"
     browser: Literal["lightpanda"] = "lightpanda"
     campus_url: str
     timezone: str
     campus_features_ready: bool = False
+    message: str
+
+
+class LoginResult(BaseModel):
+    """Confirmación de sesión; no contiene identidad, tokens ni credenciales."""
+
+    status: Literal["authenticated"] = "authenticated"
+    already_authenticated: bool = False
+    attempts: int
     message: str

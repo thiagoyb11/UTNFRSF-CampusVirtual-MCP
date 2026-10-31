@@ -4,7 +4,9 @@ Un servidor MCP para conectar asistentes de inteligencia artificial con el [Camp
 
 Su objetivo es facilitar las tareas cotidianas del estudiante desde un asistente, usando su cuenta del campus.
 
-> Proyecto en desarrollo. La base del servidor está disponible; las funciones del campus todavía no están implementadas.
+> Proyecto en desarrollo. El inicio de sesión ya está disponible; las consultas y entregas siguen en implementación.
+
+La herramienta `login()` usa el usuario y la contraseña configurados en el `.env` privado. Podés probarla desde un cliente MCP como Inspector; las instrucciones están en la [guía de desarrollo](docs/desarrollo.md).
 
 ## Funciones previstas
 

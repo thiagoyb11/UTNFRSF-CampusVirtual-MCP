@@ -885,6 +885,7 @@ name = "utnfrsf-campusvirtual-mcp"
 version = "0.1.0"
 source = { editable = "." }
 dependencies = [
+    { name = "anyio" },
     { name = "lightpanda" },
     { name = "mcp" },
     { name = "pydantic" },
@@ -893,13 +894,13 @@ dependencies = [
 
 [package.dev-dependencies]
 dev = [
-    { name = "anyio" },
     { name = "pytest" },
     { name = "ruff" },
 ]
 
 [package.metadata]
 requires-dist = [
+    { name = "anyio", specifier = ">=4.9,<5" },
     { name = "lightpanda", specifier = ">=1.0.2,<2" },
     { name = "mcp", specifier = ">=2.3,<3" },
     { name = "pydantic", specifier = ">=2.12,<3" },
@@ -908,7 +909,6 @@ requires-dist = [
 
 [package.metadata.requires-dev]
 dev = [
-    { name = "anyio", specifier = ">=4.9,<5" },
     { name = "pytest", specifier = ">=8.4,<10" },
     { name = "ruff", specifier = ">=0.14,<1" },
 ]

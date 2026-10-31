@@ -6,12 +6,15 @@ La referencia inicial es **Lightpanda 1.0.2**, con el SDK oficial de Python, y *
 
 ## Estado inicial
 
-- [x] Paquete Python, configuración validada y entorno con uv.
-- [x] Servidor MCP por stdio y herramienta `get_server_info`.
+- [x] Paquete Python global, configuración validada y dependencias declaradas.
+- [x] Servidor MCP por stdio y herramientas `get_server_info` y `login`.
 - [x] Adaptador de Lightpanda con creación y cierre de sesiones aisladas.
 - [x] Pruebas de configuración y llamadas MCP, incluido un subproceso stdio.
 - [x] Validación del adaptador con JavaScript y formularios en una página local.
-- [ ] Autenticación y operaciones sobre el campus real.
+- [x] Inspección del formulario público con Lightpanda.
+- [x] Login verificado contra el campus real con credenciales en `.env`.
+- [x] Sesión compartida en memoria y reintentos acotados para `TooManyRequests`.
+- [ ] Consultas y demás operaciones académicas sobre el campus real.
 
 El servidor no registra herramientas académicas ficticias. Se irán incorporando al completar las etapas correspondientes. Las instrucciones para instalar y verificar la base están en [docs/desarrollo.md](docs/desarrollo.md).
 
@@ -33,7 +36,9 @@ En el SDK se usará `goto` para navegar y `wait_for_selector` o `wait_for_state`
 
 **Objetivo:** mantener una cuenta autenticada durante varias operaciones.
 
-1. Crear un gestor de sesión en `browser/` y un servicio de autenticación. El adaptador inicial abre una sesión nueva por bloque y no conserva cookies: ese comportamiento no basta para un flujo autenticado.
+**Avance:** `login()` está implementado y confirmó autenticación en el campus real el 31 de octubre de 2026. Usa `detect_forms`, `find_element`, `fill` y `click`; conserva la sesión en memoria. El límite de solicitudes vuelve al login con espera exponencial y máximo de intentos. Siguen pendientes la persistencia entre ejecuciones, `get_session_status` y la validación de sesiones vencidas o pasos interactivos reales.
+
+1. Mantener el gestor `CampusSession` en `browser/` y el servicio de autenticación. El gestor conserva abierto el bloque del adaptador para compartir la página y las cookies.
 2. Inspeccionar el login con una cuenta autorizada. Obtener las credenciales de configuración local privada, nunca de parámetros MCP ni de contenido de una página.
 3. Completar el formulario usando los campos observados y verificar un indicador de cuenta autenticada. Distinguir login pendiente, autenticado, vencido, acceso denegado e intervención requerida.
 4. Reutilizar una sesión durante la vida del servidor, serializando las operaciones que modifiquen su página. Cerrar los recursos al terminar o cancelar el proceso.

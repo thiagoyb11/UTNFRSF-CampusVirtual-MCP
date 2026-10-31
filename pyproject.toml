@@ -10,6 +10,7 @@ readme = "README.md"
 requires-python = ">=3.11"
 license = "MIT"
 dependencies = [
+    "anyio>=4.9,<5",
     "lightpanda>=1.0.2,<2",
     "mcp>=2.3,<3",
     "pydantic>=2.12,<3",
@@ -24,7 +25,6 @@ Repository = "https://github.com/thiagoyb11/UTNFRSF-CampusVirtual-MCP"
 
 [dependency-groups]
 dev = [
-    "anyio>=4.9,<5",
     "pytest>=8.4,<10",
     "ruff>=0.14,<1",
 ]

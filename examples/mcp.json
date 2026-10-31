@@ -1,13 +1,11 @@
 {
   "mcpServers": {
     "utnfrsf-campus": {
-      "command": "uv",
+      "command": "/opt/homebrew/bin/python3",
+      "cwd": "/ruta/absoluta/UTNFRSF-CampusVirtual-MCP",
       "args": [
-        "--directory",
-        "/ruta/absoluta/UTNFRSF-CampusVirtual-MCP",
-        "run",
-        "--locked",
-        "utnfrsf-campus-mcp"
+        "-m",
+        "utnfrsf_campus_mcp"
       ]
     }
   }

@@ -1,0 +1,9 @@
+"""Errores de dominio con mensajes seguros para mostrar al asistente."""
+
+
+class LoginError(Exception):
+    """Solo recibe códigos y mensajes propios, nunca respuestas del navegador."""
+
+    def __init__(self, code: str, message: str) -> None:
+        self.code = code
+        super().__init__(f"{code}: {message}")

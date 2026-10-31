@@ -1,10 +1,10 @@
-"""Configuración local sin credenciales ni estado de autenticación."""
+"""Configuración local y credenciales que nunca se publican mediante MCP."""
 
 from pathlib import Path
 from typing import Literal
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
-from pydantic import Field, field_validator
+from pydantic import Field, SecretStr, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 CAMPUS_BASE_URL = "https://campusvirtual.frsf.utn.edu.ar/"
@@ -26,6 +26,11 @@ class Settings(BaseSettings):
     browser_timeout_seconds: float = Field(default=30, gt=0, le=300, allow_inf_nan=False)
     navigation_timeout_ms: int = Field(default=10_000, gt=0, le=120_000)
     lightpanda_binary: Path | None = None
+    username: SecretStr | None = Field(default=None, repr=False, exclude=True)
+    password: SecretStr | None = Field(default=None, repr=False, exclude=True)
+    login_max_attempts: int = Field(default=3, ge=1, le=5)
+    login_retry_delay_seconds: float = Field(default=2, ge=0.5, le=30, allow_inf_nan=False)
+    login_timeout_seconds: float = Field(default=90, gt=0, le=180, allow_inf_nan=False)
 
     @field_validator("timezone")
     @classmethod

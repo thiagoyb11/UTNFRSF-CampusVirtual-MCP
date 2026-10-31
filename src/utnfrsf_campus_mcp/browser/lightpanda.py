@@ -11,8 +11,8 @@ from utnfrsf_campus_mcp.config import Settings
 class LightpandaBrowser:
     """Abre una sesión aislada por operación y libera sus recursos al salir.
 
-    Esta base no conserva cookies entre operaciones. El flujo autenticado
-    necesitará un gestor de sesión compartida, según el roadmap.
+    Este adaptador proporciona el bloque de ciclo de vida. CampusSession
+    lo mantiene abierto para conservar la autenticación entre herramientas.
     """
 
     def __init__(self, settings: Settings) -> None:

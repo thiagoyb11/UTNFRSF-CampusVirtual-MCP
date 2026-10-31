@@ -14,7 +14,7 @@ def get_server_info(settings: Settings) -> ServerInfo:
         campus_url=CAMPUS_BASE_URL,
         timezone=settings.timezone,
         message=(
-            "Base inicial del servidor. Autenticación, materias, calendario, "
+            "Login disponible mediante credenciales locales. Materias, calendario, "
             "descargas y entregas todavía no están implementados."
         ),
     )
