@@ -1,4 +1,6 @@
-"""Helper interno de asignaturas para futuros casos de uso de recursos del curso."""
+"""Consulta de materias de Grado para MCP y otros servicios académicos."""
+
+from datetime import UTC, datetime
 
 from anyio import fail_after
 from lightpanda import LightpandaError
@@ -6,7 +8,7 @@ from lightpanda import LightpandaError
 from utnfrsf_campus_mcp.browser.session import CampusSession
 from utnfrsf_campus_mcp.config import CAMPUS_BASE_URL, Settings
 from utnfrsf_campus_mcp.errors import CourseError
-from utnfrsf_campus_mcp.models import Course
+from utnfrsf_campus_mcp.models import Course, CourseList
 from utnfrsf_campus_mcp.parsers.courses import DEGREE_COURSES_SCHEMA, parse_degree_courses
 from utnfrsf_campus_mcp.parsers.login import (
     LOGIN_PAGE_STATE_SCRIPT,
@@ -24,11 +26,21 @@ class CourseService:
         self._session = session
         self._authentication = authentication
 
+    async def list_courses(self) -> CourseList:
+        """Publica el alcance y la procedencia de un listado completo de Grado."""
+        courses = await self.list_degree_courses()
+        return CourseList(
+            source_url=CAMPUS_BASE_URL,
+            fetched_at=datetime.now(UTC),
+            total=len(courses),
+            courses=courses,
+        )
+
     async def list_degree_courses(self) -> list[Course]:
         """Lista My courses → Grado (incluye Sistemas y Básicas) sin expandir ramas ni abrir cursos.
 
-        Conserva el orden de la sidebar y los años disponibles para la cuenta. Es un helper
-        interno; no registra una herramienta MCP. Reutiliza el modelo Course y la sesión.
+        Conserva el orden de la sidebar y los años disponibles para la cuenta. Es la base
+        interna de list_courses y del inventario de recursos; reutiliza Course y la sesión.
         """
         await self._authentication.login()
         try:

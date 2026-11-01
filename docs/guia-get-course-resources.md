@@ -2,7 +2,7 @@
 
 Inspección del **31 de octubre de 2026** sobre el campus real, con Lightpanda 1.0.2 y la cuenta autorizada de `.env`. Se revisaron **cuatro materias: dos específicas de Sistemas y dos básicas**, siguiendo la distribución solicitada. Este documento complementa [estructura-campus.md](estructura-campus.md): las observaciones anteriores de `topics` no se pueden generalizar a todas las materias.
 
-Está implementado el helper interno `CourseService.list_degree_courses()`. **Estado actualizado:** `get_course_resources(course_id)` ya está implementada y registrada; consultá [contrato, alcance y verificación](recursos.md). Esta guía conserva la evidencia de la inspección previa. La inspección consultó páginas, pestañas y carpetas; no descargó bibliografía ni modificó entregas, grupos o inscripciones.
+Está implementado el helper interno `CourseService.list_degree_courses()`, ahora expuesto mediante `list_courses()`; consultá el [contrato de materias](materias.md). **Estado actualizado:** `get_course_resources(course_id)` ya está implementada y registrada; consultá [contrato, alcance y verificación](recursos.md). Esta guía conserva la evidencia de la inspección previa. La inspección consultó páginas, pestañas y carpetas; no descargó bibliografía ni modificó entregas, grupos o inscripciones.
 
 ## 1. Helper para My courses → Grado
 

@@ -8,6 +8,8 @@ Su objetivo es facilitar las tareas cotidianas del estudiante desde un asistente
 
 `login()` usa las credenciales del `.env` privado. `list_monthly_activities()` devuelve JSON con las fechas, horarios, asignaturas y enlaces directos de las actividades del calendario. Podés probarlas en Inspector siguiendo la [guía de desarrollo](docs/desarrollo.md). Los parámetros y ejemplos de la consulta mensual están en [su guía](docs/calendario.md).
 
+`list_courses()` devuelve las materias visibles en Grado, con ID, nombre y enlace, incluidos años anteriores. Permite encontrar la materia antes de consultar recursos o entregas. Ver [alcance y verificación](docs/materias.md).
+
 `get_course_resources(course_id)` lista los enlaces de una materia, incluidas tareas, archivos y materiales de carpetas. Recorre secciones y devuelve el alcance de la consulta. Ver [uso y límites](docs/recursos.md); verificada en Análisis Numérico (`topics`); queda pendiente la validación integral de `onetopic`.
 
 `download_resources(course_id, module_id, urls)` descarga archivos de cualquier tipo del módulo indicado a `downloads/`, valida la transferencia y devuelve rutas, tamaños y hashes. Ver [uso y límites](docs/descargas.md).
@@ -49,7 +51,7 @@ roadmap.md          # Plan de implementación.
 AGENTS.md           # Guía para agentes de desarrollo.
 ```
 
-Documentación técnica: [desarrollo local](docs/desarrollo.md) · [roadmap](roadmap.md).
+Documentación técnica: [desarrollo local](docs/desarrollo.md) · [roadmap](roadmap.md) · [análisis y funcionalidades pendientes](docs/funcionalidades-pendientes.md).
 
 ## Licencia
 

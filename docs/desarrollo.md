@@ -28,6 +28,7 @@ Las herramientas disponibles son:
 
 - **`get_server_info`**: informa versión y alcance, sin abrir el navegador.
 - **`login`**: inicia o verifica la sesión del campus usando las credenciales privadas de configuración. No recibe argumentos.
+- **`list_courses`**: lista las materias de My courses → Grado, con IDs, nombres completos, enlaces y momento de consulta. Sin parámetros; incluye Sistemas y Básicas de los años visibles. Verificada mediante MCP stdio contra el campus real: dos llamadas consecutivas, 30 materias por llamada. [Contrato y límites](materias.md).
 - **`list_monthly_activities`**: devuelve JSON con las actividades del mes, asignaturas, fechas y enlaces directos. Parámetros y ejemplos en [actividades del mes](calendario.md). Verificada contra el campus real el 31 de octubre de 2026: mes actual, mes explícito, filtro de deadlines y enlace del popup.
 
 - **`get_course_resources(course_id)`**: lista enlaces de una materia de Grado, incluidas tareas, PDF/ZIP y archivos de carpetas. Recorre formatos `topics` y `onetopic` y devuelve procedencia y estado de integridad. [Contrato y límites](recursos.md). Pruebas locales completas y validación real en Análisis Numérico (`topics`): 189 enlaces, sin pendientes. Falta validar integralmente `onetopic`.
@@ -96,6 +97,8 @@ La sesión se conserva en memoria durante la ejecución del proceso MCP y se cie
 
 [examples/mcp.json](../examples/mcp.json) usa el formato `mcpServers`. Ajustá `cwd` a la ruta absoluta del proyecto y `command` al Python global compatible de tu sistema. El directorio de trabajo determina qué `.env` se carga.
 
+Tras actualizar el código, reiniciá la conexión o el proceso MCP del host para que anuncie `list_courses`. No se necesita registrar Lightpanda como otro servidor: el adaptador del campus lo inicia internamente.
+
 ## Organización
 
 - `server.py`: registro de herramientas y cierre de recursos con el ciclo de vida del servidor.
@@ -103,7 +106,7 @@ La sesión se conserva en memoria durante la ejecución del proceso MCP y se cie
 - `browser/`: adaptador de Lightpanda y sesión compartida con acceso serializado.
 - `parsers/login.py`: identificación del formulario y señales de estado de la página.
 - `services/authentication.py`: flujo de acceso y política de reintentos.
-- `services/courses.py`: helper interno `CourseService.list_degree_courses()` para My courses → Grado, con normalización en `parsers/courses.py`. No agrega una herramienta a Inspector. Uso y estructura de materias en [la guía para recursos](guia-get-course-resources.md).
+- `services/courses.py`: `list_courses()` agrega alcance, fuente y fecha al helper `list_degree_courses()` de My courses → Grado. `tools/courses.py` publica la herramienta MCP; comparte servicio y sesión con recursos. Contrato en [materias](materias.md) y estructura observada en [la guía para recursos](guia-get-course-resources.md).
 - `browser/calendar.py`: lectura del módulo de calendario de Moodle en Lightpanda.
 - `parsers/calendar.py` y `services/calendar.py`: validación del mes, fechas, enlaces y consulta mensual.
 - `browser/resources.py`, `parsers/resources.py` y `services/resources.py`: inventario de enlaces por asignatura y ampliación de páginas de recursos.
@@ -118,6 +121,10 @@ Los tests y `scripts/test.sh` son archivos locales ignorados por Git. No están 
 bash scripts/test.sh
 bash scripts/test.sh --with-lightpanda
 ```
+
+La incorporación de `list_courses` aprobó 145 pruebas locales, con 13 integraciones optativas omitidas, además de lint y formato. Las pruebas focalizadas de cursos, registro y stdio se ejecutan con `/opt/homebrew/bin/python3 -m pytest tests/test_courses.py tests/test_server.py tests/test_stdio.py -q`. Usan datos sintéticos; cubren respuesta vacía válida, materias de distintos períodos, sesión vencida, rama incompleta, errores privados y descubrimiento por MCP.
+
+La comprobación real optativa usa el cliente oficial de MCP y el entrypoint stdio: `/opt/homebrew/bin/python3 .local/check_courses_mcp.py`, cuando ese diagnóstico local esté disponible. Lee `.env` en el servidor y consulta dos veces `list_courses`, sin escrituras académicas. No integra la suite por defecto. Ejecutarlo desde una terminal con restricciones puede impedir iniciar Lightpanda; esta prueba se completó fuera del sandbox con autorización. Exponer la herramienta evita el helper de terminal en el uso habitual, pero no elimina las restricciones del entorno donde se lance un servidor.
 
 Los controles de código se pueden ejecutar directamente:
 

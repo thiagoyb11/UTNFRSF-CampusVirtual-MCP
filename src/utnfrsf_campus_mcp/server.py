@@ -21,6 +21,7 @@ from utnfrsf_campus_mcp.services.resources import ResourceService
 from utnfrsf_campus_mcp.services.submissions import SubmissionService
 from utnfrsf_campus_mcp.tools.authentication import register_authentication
 from utnfrsf_campus_mcp.tools.calendar import register_calendar
+from utnfrsf_campus_mcp.tools.courses import register_courses
 from utnfrsf_campus_mcp.tools.diagnostics import register_diagnostics
 from utnfrsf_campus_mcp.tools.downloads import register_downloads
 from utnfrsf_campus_mcp.tools.resources import register_resources
@@ -45,6 +46,7 @@ def create_server(settings: Settings | None = None) -> MCPServer:
     register_authentication(server, authentication)
     register_calendar(server, CalendarService(config, session, authentication))
     courses = CourseService(config, session, authentication)
+    register_courses(server, courses)
     resources = ResourceService(config, session, courses)
     register_resources(server, resources)
     register_downloads(server, DownloadService(resources, session))

@@ -2,6 +2,8 @@
 
 Este documento describe cómo pasar de la base inicial a un MCP capaz de operar sobre el Campus Virtual de la UTN FRSF. Cada etapa debe terminar con una capacidad verificable antes de avanzar a la siguiente.
 
+El [análisis del campus y las funcionalidades pendientes](docs/funcionalidades-pendientes.md) mantiene el inventario detallado actual, con prioridades, estado, evidencia y criterios de cierre. Esta guía conserva las etapas generales; los pendientes concretos se actualizan en ese inventario cada vez que se incorpora o amplía una funcionalidad.
+
 La referencia inicial es **Lightpanda 1.0.2**, con el SDK oficial de Python, y **MCP Python SDK 2.3.0**. Las versiones exactas de las dependencias están en `uv.lock`. La documentación de Lightpanda puede describir cambios posteriores al paquete instalado: hay que contrastar las firmas y herramientas reales al implementar cada paso.
 
 ## Estado inicial
@@ -56,7 +58,7 @@ El SDK ofrece contextos aislados con sus propios datos de navegación. La polít
 
 **Objetivo:** listar y resolver asignaturas de la cuenta.
 
-**Avance:** helper interno `CourseService.list_degree_courses()` implementado y verificado contra My courses → Grado: 30 asignaturas, excluyendo Ingreso y Extensión. Reutiliza `Course`; todavía no existe una herramienta MCP pública `list_courses`. El recorrido y las restricciones están en [la guía de recursos](docs/guia-get-course-resources.md).
+**Avance:** `list_courses()` implementada y registrada sobre `CourseService.list_degree_courses()`. Devuelve alcance Grado, fuente, fecha de consulta, total y materias con ID, nombre y URL. Verificada contra el campus real el 31 de octubre de 2026 mediante el cliente oficial MCP sobre stdio: dos consultas consecutivas de 30 asignaturas, excluyendo Ingreso y Extensión. Reutiliza la sesión compartida y falla explícitamente ante ramas pendientes o límites; no pagina ni expande categorías dinámicas. Ver [contrato de materias](docs/materias.md) y [estructura observada](docs/guia-get-course-resources.md). Búsquedas y filtros siguen pendientes en F02.
 
 1. Inspeccionar el listado de materias autenticado y sus mecanismos de carga o paginación.
 2. Incorporar un modelo `Course` con identificador, nombre y URL de origen.
@@ -145,6 +147,6 @@ La [referencia de herramientas de Lightpanda](https://lightpanda.io/docs/referen
 
 ## Orden de trabajo
 
-El primer hito académico es **autenticación + `list_courses`**. Las consultas de fechas y bibliografía pueden aportar valor antes de resolver la carga de archivos. Una limitación en entregas no debe impedir publicar las consultas que ya estén verificadas.
+La secuencia inicial proponía **autenticación + `list_courses`**; ambas herramientas ya están expuestas y verificadas. El proyecto también verificó calendario, recursos, descargas y una entrega autorizada. El orden recomendado para el estado actual está en [el inventario de pendientes](docs/funcionalidades-pendientes.md#orden-recomendado).
 
 Las decisiones sobre login, selectores y carga de archivos dependen de evidencia del campus y de la versión concreta de Lightpanda. Registrar los hallazgos en `docs/` a medida que se comprueben, manteniendo este documento como guía del trabajo pendiente.

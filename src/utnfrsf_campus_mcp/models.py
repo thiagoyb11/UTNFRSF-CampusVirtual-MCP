@@ -35,6 +35,17 @@ class Course(BaseModel):
     url: str
 
 
+class CourseList(BaseModel):
+    """Materias visibles en Grado; una extracción incompleta produce un error."""
+
+    scope: Literal["Grado"] = "Grado"
+    source_url: str
+    fetched_at: AwareDatetime
+    total: int
+    courses: list[Course]
+    complete: Literal[True] = True
+
+
 class CalendarActivity(BaseModel):
     """Evento de actividad; un cierre y un vencimiento son eventos diferentes."""
 
