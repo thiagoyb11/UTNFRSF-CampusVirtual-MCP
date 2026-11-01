@@ -14,6 +14,8 @@ Su objetivo es facilitar las tareas cotidianas del estudiante desde un asistente
 
 `download_resources(course_id, module_id, urls)` descarga archivos de cualquier tipo del módulo indicado a `downloads/`, valida la transferencia y devuelve rutas, tamaños y hashes. Ver [uso y límites](docs/descargas.md).
 
+`get_server_info()` indica qué herramientas están verificadas en el campus, cuáles solo parcialmente y cuáles tienen solo pruebas locales, con sus límites conocidos.
+
 `get_submission_status()` consulta una tarea; `prepare_submission()` valida archivos localmente; `upload_files()` los carga a un área temporal; `submit_assignment()` guarda y, opcionalmente, finaliza la entrega. Ver [contrato y verificación](docs/entregas.md). La carga y el guardado se verificaron mediante MCP en el TP 6 de Análisis Numérico, con estado final enviado y comprobación de los bytes.
 
 ## Funciones previstas

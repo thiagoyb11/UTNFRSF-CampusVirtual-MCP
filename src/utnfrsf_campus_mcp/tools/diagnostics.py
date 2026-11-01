@@ -19,6 +19,16 @@ def register_diagnostics(server: MCPServer, settings: Settings) -> None:
             open_world_hint=False,
         )
     )
-    def get_server_info() -> ServerInfo:
-        """Consulta la versión y alcance del MCP. No verifica una sesión del campus."""
-        return read_server_info(settings)
+    async def get_server_info() -> ServerInfo:
+        """Consulta versión, zona horaria y el estado real de cada herramienta registrada.
+
+        No abre Lightpanda ni verifica la sesión del campus. Cada elemento de
+        capabilities indica efecto (none, local, read, write), nivel de evidencia
+        (local_tests, campus_partial, campus_verified), fecha de verificación real,
+        alcance, límites pendientes, IDs relacionados del inventario y documentación.
+        undocumented_tools lista herramientas registradas sin estado declarado.
+        """
+        # Se consulta el registro en cada llamada: las herramientas se registran
+        # después de esta, y así el resultado refleja el servidor en ejecución.
+        tools = await server.list_tools()
+        return read_server_info(settings, (tool.name for tool in tools))

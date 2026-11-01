@@ -1,8 +1,39 @@
 """Modelos de las capacidades disponibles en la base inicial."""
 
+from datetime import date
 from typing import Literal
 
 from pydantic import AwareDatetime, BaseModel
+
+# Nivel de evidencia de una herramienta. Se ordena de menor a mayor:
+# - local_tests: solo pruebas locales con fixtures o dobles del adaptador.
+# - campus_partial: verificada en el campus real para una parte de su alcance.
+# - campus_verified: su alcance documentado se comprobó en el campus real.
+CapabilityStatus = Literal["local_tests", "campus_partial", "campus_verified"]
+
+# Efecto observable de una llamada; debe coincidir con las anotaciones MCP:
+# - none: no lee el campus ni archivos del usuario.
+# - local_read: lee archivos locales, sin peticiones al campus.
+# - session: abre o reutiliza la sesión del campus, sin datos académicos.
+# - campus_read: consulta el campus sin modificar datos académicos ni locales.
+# - local_write: lee el campus y escribe archivos locales, como descargas.
+# - campus_write: modifica datos del campus, como cargas temporales o entregas.
+CapabilityEffect = Literal[
+    "none", "local_read", "session", "campus_read", "local_write", "campus_write"
+]
+
+
+class Capability(BaseModel):
+    """Estado declarado de una herramienta MCP registrada."""
+
+    tool: str
+    feature_ids: list[str]
+    effect: CapabilityEffect
+    status: CapabilityStatus
+    verified_on: date | None
+    scope: str
+    pending: list[str]
+    docs: str
 
 
 class ServerInfo(BaseModel):
@@ -10,11 +41,13 @@ class ServerInfo(BaseModel):
 
     name: str
     version: str
-    stage: Literal["calendar"] = "calendar"
     browser: Literal["lightpanda"] = "lightpanda"
     campus_url: str
     timezone: str
-    campus_features_ready: bool = True
+    registered_tools: list[str]
+    capabilities: list[Capability]
+    undocumented_tools: list[str]
+    pending_features_doc: str
     message: str
 
 

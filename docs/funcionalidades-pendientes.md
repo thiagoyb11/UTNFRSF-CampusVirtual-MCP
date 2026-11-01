@@ -1,6 +1,6 @@
 # Análisis del campus y funcionalidades pendientes
 
-Última revisión: **31 de octubre de 2026**.
+Última revisión: **1 de noviembre de 2026**.
 
 Este documento es el inventario de funcionalidades pendientes del proyecto. Combina el código actual, la documentación de inspecciones anteriores y una nueva comprobación de lectura con Lightpanda. Incluye implementaciones faltantes, ampliaciones y validaciones pendientes; no todo requiere crear una herramienta nueva.
 
@@ -43,7 +43,7 @@ Hay **diez herramientas registradas**:
 
 | Herramienta | Estado actual | Límite relevante |
 | --- | --- | --- |
-| `get_server_info` | Implementada, sin acceso a la cuenta. | Su campo `stage` sigue fijado en `calendar`; no representa todas las capacidades actuales. |
+| `get_server_info` | Implementada, sin acceso a la cuenta; publica el estado de cada herramienta (F45). | Declara el nivel de evidencia documentado; no comprueba la sesión ni la disponibilidad actual del campus. |
 | `login` | Implementada y verificada en el campus. | Sesión en memoria; no hay una herramienta específica de estado/cierre o recuperación del navegador. |
 | `list_courses` | Implementada y verificada mediante MCP stdio: dos llamadas consecutivas, 30 materias por llamada. | Solo My courses → Grado; incluye períodos anteriores, sin búsqueda, paginación ni expansión AJAX. Una rama incompleta o más de 1000 registros producen error. |
 | `list_monthly_activities` | Implementada y verificada, incluido filtro de vencimientos/cierres. | Consulta un mes; no determina qué trabajos siguen pendientes ni descubre actividades sin evento. |
@@ -58,7 +58,7 @@ Hay **diez herramientas registradas**:
 
 La arquitectura separa herramientas, servicios, parsers y navegador. Ya hay comprobaciones de origen, sesión, resultados parciales y hashes, además de protección frente a reemplazos y reenvíos inciertos. Esas capacidades no deben figurar como si faltaran desde cero.
 
-La auditoría documental anterior citaba **138 pruebas locales** y **3 integraciones de transporte con Lightpanda sobre un servidor sintético**. Con la incorporación de `list_courses`, `bash scripts/test.sh` aprobó **145 pruebas locales**, con **13 integraciones optativas omitidas**, además de lint y formato. La herramienta nueva se verificó por separado contra el campus mediante MCP stdio; no se repitieron las integraciones de transporte ni escrituras académicas. Los tests están ignorados por preferencia del proyecto y no están disponibles en un clon limpio. Los cambios de entregas siguen sin commit; que estén implementados en el directorio de trabajo no significa que ya formen parte de una versión publicada.
+La auditoría documental anterior citaba **138 pruebas locales** y **3 integraciones de transporte con Lightpanda sobre un servidor sintético**. Con la incorporación de `list_courses`, `bash scripts/test.sh` aprobó **145 pruebas locales**, con **13 integraciones optativas omitidas**, además de lint y formato. La herramienta nueva se verificó por separado contra el campus mediante MCP stdio; no se repitieron las integraciones de transporte ni escrituras académicas. Los tests están ignorados por preferencia del proyecto y no están disponibles en un clon limpio. Con el catálogo de capacidades de F45, la misma ejecución aprobó **151 pruebas locales**, con las mismas **13 integraciones optativas omitidas**, además de lint y formato.
 
 ## Cómo usar y mantener esta lista
 
@@ -112,6 +112,7 @@ La auditoría documental anterior citaba **138 pruebas locales** y **3 integraci
 
 - [ ] **F10 — Consultar plazos y excepciones efectivos de una tarea.** **P1 · Parcial.**
   - Distinguir apertura, vencimiento, cierre definitivo, prórrogas y restricciones aplicables a la cuenta. No basta con el evento del calendario ni con el texto “Time remaining”.
+  - Observación del usuario (1 de noviembre de 2026): una vez vencida la tarea, la vista `assign` deja de mostrar la fecha límite. Solo con entrega tardía o sin entregar figura un atraso del tipo «XX horas XX minutos XX segundos»; en una entrega a tiempo aparece la anticipación («Assignment was submitted 3 hours 46 mins early», Entrega #6 de Diseño, actividad `489575`). Ninguno de esos textos permite reconstruir un instante exacto: hay que buscar la fecha en otra fuente, como el calendario o el evento de la actividad, o devolverla ausente con el texto original.
   - **Cierre:** fechas con zona, fuente y significado, incluidas ausencias e incertidumbres; contrastar con una tarea que muestre esos datos.
 
 - [ ] **F11 — Leer Timeline y próximos eventos del Dashboard.** **P2 · Explorar.**
@@ -262,9 +263,11 @@ La auditoría documental anterior citaba **138 pruebas locales** y **3 integraci
   - Mostrar avance en recorridos y transferencias, manteniendo limpieza y acceso serializado a la página. Ya existen timeouts, lock y protección de algunas fases de escritura.
   - **Cierre:** cancelar limpia temporales o devuelve un resultado incierto reconciliable; no deja una entrega aparentemente fallida que en realidad se reenviará. No escribir progreso en stdout fuera del protocolo MCP.
 
-- [ ] **F45 — Publicar el estado real de cada capacidad.** **P1 · Parcial.**
-  - Corregir la clasificación fija `stage="calendar"` y describir alcance, límites y nivel de validación por funcionalidad.
-  - **Cierre:** `get_server_info`, README y este documento coinciden con las herramientas registradas y distinguen implementado, probado localmente y verificado en campus.
+- [x] **F45 — Publicar el estado real de cada capacidad.** **P1 · Implementada y verificada.**
+  - `get_server_info` reemplaza `stage="calendar"` y `campus_features_ready` por `registered_tools`, `capabilities`, `undocumented_tools` y `pending_features_doc`. Cada capacidad declara efecto (`none`, `local_read`, `session`, `campus_read`, `local_write`, `campus_write`), nivel de evidencia (`local_tests`, `campus_partial`, `campus_verified`), fecha de verificación real, alcance, límites, IDs relacionados de este inventario y documentación.
+  - El catálogo vive en `services/capabilities.py`. La herramienta consulta el registro del servidor en cada llamada: no anuncia herramientas ausentes, y una herramienta registrada sin entrada aparece en `undocumented_tools`.
+  - **Evidencia:** 1 de noviembre de 2026, pruebas locales: el catálogo coincide exactamente con las herramientas registradas; el efecto declarado coincide con las anotaciones MCP de lectura, mundo abierto e idempotencia; las fechas son coherentes con el nivel; los documentos y los IDs citados existen. Llamada por MCP stdio al entrypoint: 10 herramientas, 5 verificadas en el campus, 3 parcialmente y 2 solo locales. No requiere sesión del campus.
+  - **Cierre satisfecho:** `get_server_info`, el README y este documento coinciden con las herramientas registradas y distinguen pruebas locales, verificación parcial y verificación completa. Mantener el catálogo en cada cambio de capacidad. Quitar `stage` y `campus_features_ready` es un cambio incompatible del contrato 0.1.0, registrado en F48.
 
 - [ ] **F46 — Hacer reproducibles instalación y controles.** **P1 · Parcial.**
   - Verificar un clon limpio con Python global y dependencias declaradas; automatizar controles disponibles como lint y formato. Mantener explícito que los tests locales están ignorados.
@@ -276,11 +279,12 @@ La auditoría documental anterior citaba **138 pruebas locales** y **3 integraci
 
 - [ ] **F48 — Definir compatibilidad y evolución de los contratos MCP.** **P2 · Parcial.**
   - Documentar qué campos son estables, cómo se agregan capacidades y cómo se anuncian cambios incompatibles. Conservar respuestas tipadas y anotaciones coherentes con los efectos reales.
+  - Primer cambio incompatible registrado (F45, 1 de noviembre de 2026): `get_server_info` dejó de devolver `stage` y `campus_features_ready`. Los consumidores deben leer `capabilities` y `registered_tools`.
   - **Cierre:** ejemplos y contratos públicos coinciden con el servidor; agregar una capacidad no rompe consumidores existentes sin una migración documentada.
 
 ## Orden recomendado
 
-1. **Estabilizar lo ya utilizado:** F41, F45 y las validaciones F12, F13 y F26. No bloquea en paralelo las mejoras pequeñas de descubrimiento.
+1. **Estabilizar lo ya utilizado:** F41 y las validaciones F12, F13 y F26 (F45 completada el 1 de noviembre de 2026). No bloquea en paralelo las mejoras pequeñas de descubrimiento.
 2. **Completar la consulta académica básica:** F01–F05, F07–F10 y F19. El objetivo es poder preguntar por una materia y sus trabajos sin aportar IDs o interpretar enlaces manualmente.
 3. **Incorporar información cotidiana faltante:** lectura de páginas, calificaciones, devoluciones y avisos (F14, F28, F29 y F32).
 4. **Ampliar materiales y entregas:** búsqueda, lotes, metadatos, edición y reconciliación (F06, F15–F18, F20–F27), según necesidad.

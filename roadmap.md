@@ -137,6 +137,8 @@ La [referencia de herramientas de Lightpanda](https://lightpanda.io/docs/referen
 
 **Objetivo:** instalar y usar las capacidades comprobadas de forma reproducible.
 
+**Avance:** `get_server_info` publica el estado real de cada herramienta registrada desde un catálogo verificado por pruebas locales (F45, 1 de noviembre de 2026). Ver [estado de las capacidades](docs/desarrollo.md#estado-de-las-capacidades).
+
 1. Agregar CI para pruebas unitarias, lint y formato sin cuentas del campus. Mantener las integraciones reales como optativas y sin secretos en logs.
 2. Completar ejemplos de configuración de hosts MCP con las herramientas disponibles y los pasos reales de autenticación.
 3. Documentar versiones y plataformas probadas, limitaciones del campus, recuperación de sesión y errores conocidos.

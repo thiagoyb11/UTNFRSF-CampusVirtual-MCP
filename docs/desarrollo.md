@@ -26,7 +26,7 @@ El último comando espera mensajes MCP en stdin y escribe el protocolo en stdout
 
 Las herramientas disponibles son:
 
-- **`get_server_info`**: informa versión y alcance, sin abrir el navegador.
+- **`get_server_info`**: informa versión, zona horaria y el estado real de cada herramienta registrada, sin abrir el navegador ni comprobar la sesión. Ver [estado de las capacidades](#estado-de-las-capacidades).
 - **`login`**: inicia o verifica la sesión del campus usando las credenciales privadas de configuración. No recibe argumentos.
 - **`list_courses`**: lista las materias de My courses → Grado, con IDs, nombres completos, enlaces y momento de consulta. Sin parámetros; incluye Sistemas y Básicas de los años visibles. Verificada mediante MCP stdio contra el campus real: dos llamadas consecutivas, 30 materias por llamada. [Contrato y límites](materias.md).
 - **`list_monthly_activities`**: devuelve JSON con las actividades del mes, asignaturas, fechas y enlaces directos. Parámetros y ejemplos en [actividades del mes](calendario.md). Verificada contra el campus real el 31 de octubre de 2026: mes actual, mes explícito, filtro de deadlines y enlace del popup.
@@ -39,6 +39,22 @@ Las herramientas disponibles son:
 - **`prepare_submission(course_id, activity_id, files)`**: preparación local sin sesión ni escrituras remotas.
 - **`upload_files(course_id, activity_id, files)`**: carga temporal con comprobación de bytes y recibo privado en memoria.
 - **`submit_assignment(upload_id, finalize, accept_statement)`**: guarda la carga y, si se solicita, completa la confirmación final. Guardar puede entregar directamente en cursos sin borradores. Carga y guardado verificados mediante MCP en el TP 6 real con autorización explícita. [Contrato, límites y estado de verificación](entregas.md).
+
+## Estado de las capacidades
+
+`get_server_info` devuelve `capabilities`, una entrada por herramienta registrada:
+
+| Campo | Significado |
+| --- | --- |
+| `effect` | `none`, `local_read`, `session`, `campus_read`, `local_write` o `campus_write`. Coincide con las anotaciones MCP. |
+| `status` | `local_tests`: solo pruebas locales. `campus_partial`: verificada en el campus para parte de su alcance. `campus_verified`: alcance documentado verificado en el campus. |
+| `verified_on` | Fecha de la verificación real; `null` si solo hay pruebas locales. |
+| `scope`, `pending` | Alcance y límites conocidos. |
+| `feature_ids`, `docs` | IDs relacionados del [inventario de pendientes](funcionalidades-pendientes.md) y guía de la herramienta. |
+
+El catálogo está en `src/utnfrsf_campus_mcp/services/capabilities.py`. La herramienta lo filtra con el registro del servidor en cada llamada; una herramienta registrada sin entrada aparece en `undocumented_tools`. Al agregar o verificar una herramienta, actualizá su entrada en el mismo cambio. Las pruebas locales fallan si el catálogo y el registro no coinciden o si el efecto contradice las anotaciones.
+
+Desde la versión del 1 de noviembre de 2026, la respuesta ya no incluye `stage` ni `campus_features_ready`.
 
 ## Configurar el acceso
 
