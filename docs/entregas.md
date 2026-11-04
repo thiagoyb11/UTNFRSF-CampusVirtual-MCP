@@ -67,6 +67,8 @@ Después de cargar se consulta el **mismo itemid** y se descargan sus enlaces `/
 
 Los estados `new`, `draft`, `submitted` y `reopened` se obtienen de clases estructurales. Sin entrega, Moodle deja la celda de estado sin clase propia: se devuelve `new` si no hay archivos y la fila de calificación trae `submissionnotgraded` o `submissiongraded`, comprobado el 4 de noviembre de 2026 en tareas reales calificadas y sin calificar. Si faltan esas señales o se contradicen, se devuelve `unknown` con la evidencia original. El resultado de guardar puede ser `saved`, `submitted` o `uncertain`. Un recibo ya procesado no vuelve a guardar automáticamente.
 
+El draft temporal pertenece a la sesión de Moodle: tras `upload_files`, el navegador se retiene hasta entregar o hasta que venza el recibo, en lugar de cerrarse por inactividad. Si Lightpanda cae en ese intervalo, la nueva sesión no reutiliza la carga y `submit_assignment` no reenvía a ciegas.
+
 Cada POST de escritura se intenta una sola vez. Ante pérdida de respuesta se reconcilia leyendo el estado; si sigue incierto, no se reenvía. HTTP 429 se informa sin repetir la escritura. Las lecturas GET admiten hasta dos esperas acotadas según Retry-After. Durante el diagnóstico hubo 429 incluso en consultas del selector; no se atribuyeron todos a un único campo o encabezado.
 
 ## Verificación real completada

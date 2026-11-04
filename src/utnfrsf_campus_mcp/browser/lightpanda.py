@@ -12,7 +12,7 @@ class LightpandaBrowser:
     """Abre una sesión aislada por operación y libera sus recursos al salir.
 
     Este adaptador proporciona el bloque de ciclo de vida. CampusSession
-    lo mantiene abierto para conservar la autenticación entre herramientas.
+    lo mantiene abierto mientras hay actividad y lo cierra al quedar inactivo.
     """
 
     def __init__(self, settings: Settings) -> None:

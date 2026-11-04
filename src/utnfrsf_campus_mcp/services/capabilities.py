@@ -45,9 +45,10 @@ CAPABILITIES: tuple[Capability, ...] = (
         effect="session",
         status="campus_verified",
         verified_on=_CAMPUS_CHECK_2026_10_31,
-        scope="Inicio de sesión con credenciales de .env y sesión compartida en memoria.",
+        scope="Inicio de sesión con credenciales de .env; sesión compartida con actividad.",
         pending=[
-            "Sin persistencia entre ejecuciones ni herramienta de estado o cierre de sesión.",
+            "Lightpanda se cierra por inactividad: la sesión se vuelve a iniciar.",
+            "Sin herramienta de estado ni recuperación en medio de una operación (F42).",
             "La recuperación de sesiones vencidas no se validó en el campus.",
         ],
         docs="docs/desarrollo.md",

@@ -31,7 +31,7 @@ from utnfrsf_campus_mcp.tools.submissions import register_submissions
 def create_server(settings: Settings | None = None) -> MCPServer:
     """Construye el servidor sin abrir el navegador ni realizar peticiones de red."""
     config = settings if settings is not None else Settings()
-    session = CampusSession(LightpandaBrowser(config))
+    session = CampusSession(LightpandaBrowser(config), config.browser_idle_seconds)
 
     @asynccontextmanager
     async def lifespan(server: MCPServer) -> AsyncIterator[None]:

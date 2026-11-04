@@ -21,8 +21,9 @@ def register_authentication(server: MCPServer, service: AuthenticationService) -
     async def login() -> LoginResult:
         """Inicia sesión en UTN FRSF con las credenciales locales de .env.
 
-        Conserva la sesión durante la ejecución del servidor. Reintenta
-        TooManyRequests de forma acotada, volviendo a la página de acceso.
+        Conserva la sesión mientras haya actividad; Lightpanda se cierra al quedar
+        inactivo. Reintenta TooManyRequests de forma acotada, volviendo a la página
+        de acceso.
         """
         try:
             return await service.login()

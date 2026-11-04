@@ -254,6 +254,7 @@ La auditoría documental anterior citaba **138 pruebas locales** y **3 integraci
 
 - [ ] **F42 — Recuperar sesión o navegador de forma controlada.** **P1 · Parcial.**
   - Detectar sesión vencida o proceso caído y ofrecer recuperación y cierre explícitos. La sesión compartida y su cierre al terminar ya existen.
+  - Avance (4 de noviembre de 2026): `CampusSession` cierra Lightpanda tras 60 segundos sin actividad (configurable), lo reabre bajo demanda y reemplaza un proceso caído antes de cada operación. Una carga temporal retiene la sesión hasta entregarla o hasta que venza el recibo. Evidencia real, solo lectura, con cliente MCP y 5 segundos de inactividad: cierre sin procesos restantes, reapertura y recuperación tras matar el proceso, unos 8 segundos cada una. La retención solo tiene pruebas locales. Sigue pendiente la recuperación si el navegador cae en medio de una operación y una herramienta de estado.
   - **Cierre:** una lectura puede recuperar acceso con presupuesto acotado; una escritura interrumpida primero reconcilia su resultado. Las credenciales rechazadas no provocan bucles de login.
 
 - [ ] **F43 — Paginar y continuar inventarios grandes.** **P1 · Parcial.**

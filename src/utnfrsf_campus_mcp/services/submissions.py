@@ -42,6 +42,8 @@ from utnfrsf_campus_mcp.parsers.submissions import (
 )
 from utnfrsf_campus_mcp.services.authentication import AuthenticationService
 
+RECEIPT_TTL_SECONDS = 1800
+
 
 @dataclass(repr=False)
 class _UploadContext:
@@ -184,7 +186,9 @@ class SubmissionService:
     ) -> UploadedFiles:
         plan = prepare_submission(course_id, activity_id, files)
         self._uploads = {
-            k: v for k, v in self._uploads.items() if time.monotonic() - v.created_at < 1800
+            k: v
+            for k, v in self._uploads.items()
+            if time.monotonic() - v.created_at < RECEIPT_TTL_SECONDS
         }
         if len(self._uploads) >= 32:
             raise fail("UPLOAD_TOO_MANY_RECEIPTS", "Hay demasiadas cargas recientes en memoria.")
@@ -332,6 +336,8 @@ class SubmissionService:
                     )
                 receipt = uuid.uuid4().hex
                 self._uploads[receipt] = _UploadContext(plan, account, before, form, objects[0])
+                # El draft pertenece a esta sesión: cerrarla invalidaría el recibo.
+                self._session.hold(receipt, RECEIPT_TTL_SECONDS)
                 return UploadedFiles(
                     upload_id=receipt,
                     course_id=course_id,
@@ -386,7 +392,7 @@ class SubmissionService:
         self, upload_id: str, finalize: bool = False, accept_statement: bool = False
     ) -> SubmissionResult:
         context = self._uploads.get(upload_id)
-        if context is None or time.monotonic() - context.created_at >= 1800:
+        if context is None or time.monotonic() - context.created_at >= RECEIPT_TTL_SECONDS:
             raise fail(
                 "UPLOAD_RECEIPT_EXPIRED", "El recibo no existe o venció; no se reenvió la entrega."
             )
@@ -528,6 +534,8 @@ class SubmissionService:
             context.phase = "submitted" if status.state == "submitted" else "saved"
         else:
             context.phase = "uncertain"
+        if context.phase != "saved":
+            self._session.release_hold(upload_id)
         return SubmissionResult(
             upload_id=upload_id,
             stage=context.phase,

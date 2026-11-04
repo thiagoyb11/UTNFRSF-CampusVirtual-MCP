@@ -27,6 +27,7 @@ Estas instrucciones se aplican a todo el repositorio. Su propósito es mantener 
 - El servidor no necesita un LLM propio. No agregues un proveedor de IA, una base de datos o un servicio cloud sin un caso de uso que lo requiera.
 - Empezá con stdio. Reservá stdout exclusivamente para el protocolo MCP; enviá los logs propios y de subprocesos a stderr o a archivos locales privados.
 - Cerrá páginas, sesiones y procesos al terminar o cancelar una operación. Si hay concurrencia, evitá que dos operaciones naveguen simultáneamente sobre una misma página mutable.
+- Por pedido del usuario, Lightpanda no debe quedar abierto sin uso. `CampusSession` lo abre bajo demanda, lo cierra tras `UTN_CAMPUS_BROWSER_IDLE_SECONDS` sin actividad (60 por defecto) y reemplaza un proceso caído. No lo cierres a mano ni agregues un proceso persistente; la única excepción es una carga temporal pendiente, que retiene la sesión hasta entregarla o hasta que venza su recibo.
 
 ## Herramientas y resultados
 
