@@ -57,7 +57,7 @@ class DownloadService:
             )
         files, failures = [], []
         async with self._session.acquire() as page:
-            await self._resources._require_session(page)
+            await self._resources.require_session(page)
             cookies = session_cookie_jar(await page.get_cookies(url=CAMPUS_BASE_URL))
             for url in urls:
                 try:

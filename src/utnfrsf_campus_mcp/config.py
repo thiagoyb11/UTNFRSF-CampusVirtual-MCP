@@ -23,9 +23,9 @@ class Settings(BaseSettings):
 
     timezone: str = "America/Argentina/Cordoba"
     log_level: Literal["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"] = "INFO"
-    browser_timeout_seconds: float = Field(default=30, gt=0, le=300, allow_inf_nan=False)
+    browser_timeout_seconds: float = Field(default=45, gt=0, le=300, allow_inf_nan=False)
     browser_idle_seconds: float = Field(default=60, gt=0, le=3600, allow_inf_nan=False)
-    navigation_timeout_ms: int = Field(default=10_000, gt=0, le=120_000)
+    navigation_timeout_ms: int = Field(default=30_000, gt=0, le=120_000)
     lightpanda_binary: Path | None = None
     username: SecretStr | None = Field(default=None, repr=False, exclude=True)
     password: SecretStr | None = Field(default=None, repr=False, exclude=True)

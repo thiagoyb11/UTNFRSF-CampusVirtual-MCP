@@ -57,6 +57,42 @@ COURSE_CONTENT_SCRIPT = r"""(() => {
             '#region-main .alert-danger, #region-main .errorbox')};
 })()"""
 
+# HTML publicado en una sección, sin controles de edición. __SECTION__ se reemplaza por un entero.
+SECTION_CONTENT_SCRIPT = r"""(() => {
+    const root = document.querySelector('#region-main .course-content');
+    const section = root?.querySelector('li.section[data-sectionid="__SECTION__"]');
+    const text = el => el?.textContent?.trim() || null;
+    const limit = 300000;
+    const html = el => el ? el.innerHTML.slice(0, limit) : null;
+    const activities = section ? [...section.querySelectorAll('li.activity[data-id]')] : [];
+    return {url: location.href, course_id: new URL(location.href).searchParams.get('id'),
+        present: !!root, found: !!section,
+        name: section?.getAttribute('data-sectionname') ||
+            text(section?.querySelector('.sectionname')),
+        summary: html(section?.querySelector('.summarytext')),
+        activities: activities.slice(0, 500).map(a => ({
+            id: a.getAttribute('data-id'), classes: a.className,
+            name: a.querySelector('[data-region="activity-card"]')
+                ?.getAttribute('data-activityname') || text(a.querySelector('.instancename')),
+            html: html(a.querySelector('.activity-altcontent')),
+            availability: text(a.querySelector(
+                '.availabilityinfo, [data-region="availabilityinfo"]'))
+        })),
+        truncated: activities.length > 500,
+        access_denied: !!document.querySelector(
+            '#region-main .alert-danger, #region-main .errorbox')};
+})()"""
+
+# Solo el cuerpo publicado de mod/page, sin navegación ni bloques laterales.
+PAGE_CONTENT_SCRIPT = r"""(() => {
+    const main = document.querySelector('#region-main');
+    const box = main?.querySelector('.box.generalbox');
+    return {url: location.href, body: document.body.id, course_id: M.cfg.courseId,
+        name: main?.querySelector('h2')?.textContent?.trim() || null,
+        html: box ? box.innerHTML.slice(0, 500000) : null,
+        access_denied: !!main?.querySelector('.alert-danger, .errorbox')};
+})()"""
+
 # GET de páginas conocidas: no sigue redirecciones (tampoco a un origen externo),
 # no descarga binarios ni ejecuta el HTML recibido. forceview es el parámetro de lectura
 # de mod/resource/view.php de Moodle para obtener el enlace incluso en modo download.

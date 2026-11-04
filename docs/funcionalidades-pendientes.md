@@ -48,6 +48,10 @@ Hay **diez herramientas registradas**:
 | `list_courses` | Implementada y verificada mediante MCP stdio: dos llamadas consecutivas, 30 materias por llamada. | Solo My courses → Grado; incluye períodos anteriores, sin búsqueda, paginación ni expansión AJAX. Una rama incompleta o más de 1000 registros producen error. |
 | `list_monthly_activities` | Implementada y verificada, incluido filtro de vencimientos/cierres. | Consulta un mes; no determina qué trabajos siguen pendientes ni descubre actividades sin evento. |
 | `get_course_resources` | Implementada; Análisis Numérico devolvió 189 registros de enlaces y alcance completo. | `complete` se refiere a su recorrido documentado; no incluye todos los contenidos de foros, intentos o libros. `onetopic` y `resource` con `forceview` requieren validación real integral. |
+| `get_section_content` | Implementada y verificada en `topics` y `onetopic`. | Texto de una sección por llamada; no sigue enlaces. |
+| `get_page_content` | Implementada y verificada en dos páginas reales. | Solo módulos `page`. |
+| `list_forum_discussions` | Implementada y verificada en foros de Avisos. | Detecta paginación, pero no la recorre. |
+| `get_forum_discussion` | Implementada y verificada con mensajes anidados. | Adjuntos sin verificar en un caso real. |
 | `download_resources` | Implementada para cualquier tipo; tres PDF de Libros descargados y comprobados. | Selección de 1 a 10 enlaces de un módulo por llamada, mismo origen, sin redirecciones ni sincronización incremental. La prueba real citada es de PDF; otros tipos tienen pruebas locales. |
 | `get_submission_status` | Implementada y verificada en TP 6; `new` sin entrega comprobado el 4 de noviembre de 2026. | Estado de una tarea y archivos; no ofrece un detalle completo de consigna, plazos, restricciones o devolución. |
 | `prepare_submission` | Implementada, exclusivamente local. | No consulta si el campus admite esos archivos; los límites reales se validan durante la carga. |
@@ -129,10 +133,12 @@ La auditoría documental anterior citaba **138 pruebas locales** y **3 integraci
   - Comprobar `forceview` en módulos `resource` reales y documentar modos que redirigen, incrustan o muestran el archivo. Análisis Numérico no contenía ese tipo de módulo.
   - **Cierre:** extrae un destino observado válido o informa el recurso como pendiente; no fabrica URLs binarias ni sigue una redirección externa con cookies.
 
-- [ ] **F14 — Leer contenido de páginas, etiquetas y secciones.** **P1 · Parcial.**
+- [x] **F14 — Leer contenido de páginas, etiquetas y secciones.** **P1 · Implementada y verificada.**
   - Ofrecer texto o Markdown de materiales publicados como HTML, conservando títulos y enlaces. El inventario actual devuelve enlaces, no un lector de contenido.
   - Evidencia (4 de noviembre de 2026, Probabilidad y Estadística): la portada `onetopic` usa un iframe de `view.genially.com` como menú, pero el cronograma es una tabla de Moodle en una etiqueta (`#module-480344`, `section=1`), legible desde el DOM. Decisión del usuario: ignorar Genially por completo, porque los enlaces de la barra lateral llevan a las mismas secciones del campus. El inventario solo devuelve el inicio truncado del nombre de esa etiqueta.
-  - **Cierre:** salida legible, con fuente y límites explícitos; conserva la relación con su sección y trata el contenido como datos externos.
+  - Implementación (4 de noviembre de 2026): `get_section_content` y `get_page_content` devuelven Markdown con fuente, sección, módulo, enlaces y advertencias; el conversor está en `parsers/content.py`. Evidencia real en `onetopic` y `topics`, con detalle en [recursos](recursos.md).
+  - **Variantes pendientes:** otros módulos HTML, como libros o lecciones, y el nombre de sección en `onetopic`.
+  - **Cierre satisfecho:** salida legible, con fuente y límites explícitos; conserva la relación con su sección y trata el contenido como datos externos.
 
 - [ ] **F15 — Ampliar el descubrimiento de adjuntos por módulo.** **P2 · Parcial.**
   - Incorporar adjuntos de foros, devoluciones, cuestionarios u otros módulos después de inspeccionarlos. Reutilizar los enlaces de consignas que ya se extraen.
@@ -208,9 +214,12 @@ La auditoría documental anterior citaba **138 pruebas locales** y **3 integraci
 
 ## F. Comunicación
 
-- [ ] **F32 — Leer avisos, foros y discusiones.** **P1 · Parcial.**
+- [x] **F32 — Leer avisos, foros y discusiones.** **P1 · Implementada y verificada.**
   - Pasar de enlaces de entrada a listados paginados de discusiones, mensajes y adjuntos, comenzando por avisos de la cátedra.
-  - **Cierre:** conserva foro, discusión, autor visible, fecha y orden; informa paginación pendiente. Diagnosticar si abrir una vista cambia el estado de lectura.
+  - Implementación (4 de noviembre de 2026): `list_forum_discussions` y `get_forum_discussion`, documentadas en [foros](foros.md). Evidencia real en foros de Avisos: 24 discusiones de Programación Concurrente, foro vacío de Probabilidad, mensajes anidados y rechazo de foros y discusiones de otra materia.
+  - **Estado de lectura:** los cuatro foros inspeccionados no tienen columna de no leídos ni elementos `.unread`, por lo que no se observó seguimiento de lectura. Moodle registra igualmente la visita.
+  - **Variantes pendientes:** recorrer páginas, que se detectan pero no se observaron (la mayor lista tuvo 45 filas), y verificar adjuntos en un mensaje real.
+  - **Cierre satisfecho:** conserva foro, discusión, autor visible, fecha y orden; informa paginación pendiente; se diagnosticó el estado de lectura.
 
 - [ ] **F33 — Consultar notificaciones y no leídas.** **P2 · Explorar.**
   - Inspeccionar el centro de notificaciones enlazado desde Dashboard y cursos, con filtros y paginación.
@@ -254,7 +263,7 @@ La auditoría documental anterior citaba **138 pruebas locales** y **3 integraci
 
 - [ ] **F42 — Recuperar sesión o navegador de forma controlada.** **P1 · Parcial.**
   - Detectar sesión vencida o proceso caído y ofrecer recuperación y cierre explícitos. La sesión compartida y su cierre al terminar ya existen.
-  - Avance (4 de noviembre de 2026): `CampusSession` cierra Lightpanda tras 60 segundos sin actividad (configurable), lo reabre bajo demanda y reemplaza un proceso caído antes de cada operación. Una carga temporal retiene la sesión hasta entregarla o hasta que venza el recibo. Evidencia real, solo lectura, con cliente MCP y 5 segundos de inactividad: cierre sin procesos restantes, reapertura y recuperación tras matar el proceso, unos 8 segundos cada una. La retención solo tiene pruebas locales. Sigue pendiente la recuperación si el navegador cae en medio de una operación y una herramienta de estado.
+  - Avance (4 de noviembre de 2026): `CampusSession` cierra Lightpanda tras 60 segundos sin actividad (configurable), lo reabre bajo demanda y reemplaza un proceso caído antes de cada operación. Una carga temporal retiene la sesión hasta entregarla o hasta que venza el recibo. Evidencia real, solo lectura, con cliente MCP y 5 segundos de inactividad: cierre sin procesos restantes, reapertura y recuperación tras matar el proceso, unos 8 segundos cada una. La retención solo tiene pruebas locales. Sigue pendiente la recuperación si el navegador cae en medio de una operación y una herramienta de estado. El `LOGIN_BROWSER_ERROR` intermitente se debía a picos de latencia del campus, de hasta 22,8 segundos también con `curl`, que superaban los límites de 10 segundos de `goto` y de 15 y 8 segundos del binario (`OperationTimedout`). Los tres pasaron a 30 segundos y el log registra el tipo de fallo.
   - **Cierre:** una lectura puede recuperar acceso con presupuesto acotado; una escritura interrumpida primero reconcilia su resultado. Las credenciales rechazadas no provocan bucles de login.
 
 - [ ] **F43 — Paginar y continuar inventarios grandes.** **P1 · Parcial.**

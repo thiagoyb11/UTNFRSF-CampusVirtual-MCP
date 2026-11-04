@@ -26,6 +26,14 @@ class LightpandaBrowser:
             binary=str(binary) if binary is not None else None,
             timeout=self._settings.browser_timeout_seconds,
             verbose=False,
+            # El binario corta a 15 s y 8 s por defecto, aunque goto admita más:
+            # el campus tuvo picos de más de 20 s.
+            args=(
+                "--http-timeout",
+                str(self._settings.navigation_timeout_ms),
+                "--http-connect-timeout",
+                str(self._settings.navigation_timeout_ms),
+            ),
         ) as browser:
             async with browser.session() as page:
                 yield page

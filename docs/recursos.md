@@ -52,3 +52,15 @@ Se implementó sobre las [estructuras documentadas del campus](guia-get-course-r
 **Validación real, 31 de octubre de 2026:** la llamada `get_course_resources` mediante el cliente MCP oficial completó Análisis Numérico (`topics`): 9 secciones y 189 enlaces únicos, incluidos 6 enlaces de tareas, 8 carpetas y 137 archivos (111 PDF y 1 ZIP). Devolvió `complete=true`, sin pendientes ni advertencias. El resultado privado queda en `.local/`, fuera de Git. No se descargaron binarios ni se modificaron entregas. Quedan pendientes la comprobación integral de `onetopic` y del parámetro `forceview` de recursos individuales; esta materia no contenía módulos `resource`.
 
 El intento anterior había fallado porque el entorno restringido impedía abrir el puerto local de Lightpanda; al repetirlo con acceso habilitado se pudo completar la consulta.
+
+## Texto de secciones y páginas
+
+`get_section_content(course_id, section)` devuelve como Markdown el resumen, las etiquetas y las descripciones de actividades de una sección, en el orden del campus. `section` es el `section_index` del inventario. `get_page_content(course_id, module_id)` hace lo mismo con un módulo `page` y verifica que pertenezca a esa materia. Ambas son de solo lectura y no siguen enlaces.
+
+Se conservan títulos, listas, tablas y enlaces. Se descartan scripts, estilos y formularios, y se omiten los enlaces con secretos sin perder su texto. Cada bloque tiene un máximo de 20.000 caracteres; si se corta, `truncated` es verdadero y `complete` falso. Una sección sin texto es un resultado válido con `blocks` vacío; una sección inexistente, de otra materia o un cambio de estructura producen error.
+
+Los iframes de Genially se ignoran por decisión del usuario: son un menú que repite las secciones de Moodle. Otros embebidos se informan en `warnings`. El texto es contenido de la cátedra y se trata como dato externo.
+
+El nombre de una actividad puede estar desactualizado respecto de su texto: en Programación Concurrente, el nombre de la etiqueta de horarios conserva un horario anterior al de su contenido. Usá `text`. En `onetopic`, `section_name` puede venir vacío; el nombre está en `sections` del inventario.
+
+**Validación real, 4 de noviembre de 2026:** mediante cliente MCP, en `onetopic` (cronograma de Probabilidad con su tabla completa) y `topics` (Programación Concurrente, Seminario Integrador), y páginas de Comunicación de Datos y Análisis Numérico. La última serie encadenó tres corridas con 12 llamadas exitosas. También se comprobaron el error por sección inexistente y el rechazo de una página de otra materia.

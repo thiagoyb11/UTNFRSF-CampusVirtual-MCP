@@ -44,8 +44,8 @@ Registrá `format`, `complete`, `pending_urls` y `warnings`. Si `complete` es fa
 Guardá para cada materia:
 
 - Secciones, y tareas y cuestionarios con su ID de módulo.
-- Materiales de parciales, carpetas de trabajos prácticos y foros de avisos.
-- Etiquetas de `unlinked_activities` cuyo nombre sugiera fechas: su contenido todavía no es legible y va a `gaps`.
+- Materiales de parciales, carpetas de trabajos prácticos y foros de avisos, con su `module_id`.
+- Etiquetas de `unlinked_activities`: llamá a `get_section_content(course_id, section)` una vez por cada sección que las tenga y buscá fechas en sus bloques, sobre todo en tablas. Usá el texto, no el nombre: puede estar desactualizado. Registralas como fuente `campus`, con confianza `media`.
 - Módulos con `availability` del tipo "You belong to <grupo>": indican comisiones ajenas.
 
 Identificá la comisión del usuario por los módulos a los que tiene acceso, como la asistencia. Si no se puede saber, conservá las fechas de todas las comisiones sin elegir una.
@@ -80,6 +80,10 @@ Borrá únicamente rutas devueltas por `download_resources` en esta ejecución. 
 ### 6. Registrar fechas
 
 De cada documento tomá parciales, recuperatorios, entregas, evaluaciones de seguimiento, defensas y coloquios. No registres clases comunes ni feriados.
+
+Leé los avisos: `list_forum_discussions(course_id, forum_id)` para cada foro de Avisos, y `get_forum_discussion` para las discusiones de este año cuyo título sugiera fechas (parcial, recuperatorio, final, entrega, cambio de fecha). Registralas como fuente `campus`, con confianza `media`. Un aviso más reciente que un cronograma suele reemplazarlo: conservá ambas fechas y marcá la anterior con confianza `baja`. Leé también las respuestas: pueden corregir el aviso.
+
+Sumá las fechas de las etiquetas leídas en el paso 3. Si difieren de un documento, aplicá la regla de conflictos.
 
 Sumá el calendario: `list_monthly_activities(year, month, deadlines_only=true)` desde el mes actual hasta diciembre, descartando los eventos de materias fuera del año. Para un año pasado, omitilo.
 
@@ -140,4 +144,4 @@ Escribí ambos archivos con permisos `600`.
 
 Comprobá que `fechas.json` sea JSON válido y que ninguna ruta devuelta por las descargas siga existiendo.
 
-Informá, sin volcar la guía: materias indexadas, fechas por nivel de confianza, conflictos, vacíos, documentos leídos y borrados. Aclará que los foros de avisos todavía no se leen.
+Informá, sin volcar la guía: materias indexadas, fechas por nivel de confianza, conflictos, vacíos, documentos leídos y borrados. Indicá cuántos foros y discusiones se leyeron.

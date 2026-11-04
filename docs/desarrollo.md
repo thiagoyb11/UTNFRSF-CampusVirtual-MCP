@@ -73,9 +73,9 @@ No sobrescribas un `.env` existente ni guardes las credenciales en archivos vers
 | `UTN_CAMPUS_PASSWORD` | Vacío | Contraseña, excluida de representaciones y respuestas. |
 | `UTN_CAMPUS_TIMEZONE` | `America/Argentina/Cordoba` | Zona horaria IANA. |
 | `UTN_CAMPUS_LOG_LEVEL` | `INFO` | Nivel de logging, en mayúsculas. |
-| `UTN_CAMPUS_BROWSER_TIMEOUT_SECONDS` | `30` | Espera de respuesta del proceso Lightpanda. |
+| `UTN_CAMPUS_BROWSER_TIMEOUT_SECONDS` | `45` | Espera de respuesta del proceso Lightpanda. |
 | `UTN_CAMPUS_BROWSER_IDLE_SECONDS` | `60` | Inactividad tras la que se cierra Lightpanda. La próxima herramienta lo reabre e inicia sesión, unos 8 segundos en la prueba real. |
-| `UTN_CAMPUS_NAVIGATION_TIMEOUT_MS` | `10000` | Espera de navegación y resolución del acceso. |
+| `UTN_CAMPUS_NAVIGATION_TIMEOUT_MS` | `30000` | Espera de navegación y resolución del acceso. También fija `--http-timeout` y `--http-connect-timeout` de Lightpanda, que por defecto cortan a 15 y 8 segundos; debe ser menor que el timeout de llamada. |
 | `UTN_CAMPUS_LOGIN_MAX_ATTEMPTS` | `3` | Total máximo de intentos; solo se repite ante límites de solicitudes. |
 | `UTN_CAMPUS_LOGIN_RETRY_DELAY_SECONDS` | `2` | Espera inicial, con crecimiento exponencial y variación aleatoria. |
 | `UTN_CAMPUS_LOGIN_TIMEOUT_SECONDS` | `90` | Presupuesto total del login, incluidas las esperas. |

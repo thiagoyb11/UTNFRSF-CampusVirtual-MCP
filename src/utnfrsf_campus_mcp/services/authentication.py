@@ -1,6 +1,7 @@
 """Login del campus con formulario real, sesión compartida y reintentos acotados."""
 
 import json
+import logging
 import random
 from urllib.parse import urljoin
 
@@ -18,6 +19,8 @@ from utnfrsf_campus_mcp.parsers.login import (
     same_origin,
     select_login_form,
 )
+
+logger = logging.getLogger(__name__)
 
 
 class _RateLimited(Exception):
@@ -64,6 +67,9 @@ class AuthenticationService:
                             )
                         except LightpandaError as exc:
                             if not is_rate_limited_message(str(exc)):
+                                # Solo el tipo de fallo: el mensaje completo podría citar datos.
+                                reason = str(exc).split(":", 1)[0][:60]
+                                logger.warning("Fallo del navegador en el login: %s", reason)
                                 raise LoginError(
                                     "LOGIN_BROWSER_ERROR",
                                     "Lightpanda no pudo completar el acceso. "
