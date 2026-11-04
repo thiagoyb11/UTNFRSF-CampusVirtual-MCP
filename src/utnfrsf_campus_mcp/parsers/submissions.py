@@ -17,6 +17,8 @@ from utnfrsf_campus_mcp.models import LocalSubmissionFile, PreparedSubmission, U
 from utnfrsf_campus_mcp.parsers.login import same_origin
 
 MAX_LOCAL_FILE_BYTES = 200 * 1024 * 1024
+SUBMISSION_STATE_CLASS = re.compile(r"\bsubmissionstatus(new|draft|submitted|reopened)\b")
+GRADING_STATE_CLASS = re.compile(r"\bsubmission(?:not)?graded\b")
 
 
 def fail(code: str, message: str) -> SubmissionError:
@@ -29,6 +31,20 @@ def require_url(url: str, paths: tuple[str, ...]) -> str:
             "SUBMISSION_ACCESS_DENIED", "El destino no pertenece al flujo permitido del campus."
         )
     return url
+
+
+def parse_submission_state(classes: str, has_files: bool) -> str:
+    """Deduce el estado de las clases de la tabla, sin depender del idioma de la interfaz.
+
+    Sin entrega, Moodle deja la celda de estado sin clase propia. Se exige la fila de
+    calificación para no confundir un cambio de formato con una tarea sin entregar.
+    """
+    codes = SUBMISSION_STATE_CLASS.findall(classes)
+    if len(set(codes)) == 1:
+        return codes[0]
+    if not codes and not has_files and GRADING_STATE_CLASS.search(classes):
+        return "new"
+    return "unknown"
 
 
 @dataclass(repr=False)

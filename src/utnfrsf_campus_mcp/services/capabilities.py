@@ -22,6 +22,7 @@ PENDING_FEATURES_DOC = "docs/funcionalidades-pendientes.md"
 # Fecha de la verificación real de login, materias, calendario, recursos,
 # descargas y entregas documentada en docs/.
 _CAMPUS_CHECK_2026_10_31 = date(2026, 10, 31)
+_CAMPUS_CHECK_2026_11_04 = date(2026, 11, 4)
 
 
 CAPABILITIES: tuple[Capability, ...] = (
@@ -100,7 +101,7 @@ CAPABILITIES: tuple[Capability, ...] = (
         verified_on=_CAMPUS_CHECK_2026_10_31,
         scope="Descarga de 1 a 10 archivos observados de un módulo a downloads/.",
         pending=[
-            "La verificación real cubrió PDF; otros tipos solo tienen pruebas locales.",
+            "La verificación real cubrió PDF y XLSX; otros tipos solo tienen pruebas locales.",
             "Sin lotes de varios módulos ni sincronización incremental (F16, F18).",
         ],
         docs="docs/descargas.md",
@@ -111,8 +112,8 @@ CAPABILITIES: tuple[Capability, ...] = (
         feature_ids=["F05", "F10"],
         effect="campus_read",
         status="campus_verified",
-        verified_on=_CAMPUS_CHECK_2026_10_31,
-        scope="Estado, archivos y evidencia textual de una tarea assign.",
+        verified_on=_CAMPUS_CHECK_2026_11_04,
+        scope="Estado (new sin entrega), archivos y evidencia textual de una tarea assign.",
         pending=[
             "No devuelve consigna completa ni plazos efectivos (F05, F10).",
             "Una tarea vencida no muestra su fecha límite en esta vista.",

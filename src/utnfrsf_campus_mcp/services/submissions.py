@@ -2,7 +2,6 @@
 
 import asyncio
 import json
-import re
 import time
 import uuid
 from dataclasses import dataclass, field
@@ -36,6 +35,7 @@ from utnfrsf_campus_mcp.parsers.submissions import (
     fail,
     filemanager_options,
     parse_limits,
+    parse_submission_state,
     prepare_submission,
     require_url,
     validate_files,
@@ -123,8 +123,7 @@ class SubmissionService:
                 "No se pudo verificar la tabla de estado de la cuenta.",
             )
         classes = " ".join(r.get("classes", "") for r in rows)
-        codes = re.findall(r"\bsubmissionstatus(new|draft|submitted|reopened)\b", classes)
-        state = codes[0] if len(set(codes)) == 1 else "unknown"
+        state = parse_submission_state(classes, bool(raw.get("files")))
         actions = {}
         for action in raw.get("actions", []):
             target = require_url(action["url"], ("/mod/assign/view.php",))

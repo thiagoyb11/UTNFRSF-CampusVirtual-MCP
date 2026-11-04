@@ -65,13 +65,13 @@ Antes de escribir se comprueban cuenta, curso, actividad, formulario, estado y r
 
 Después de cargar se consulta el **mismo itemid** y se descargan sus enlaces `/draftfile.php/...` para comparar nombre, tamaño y SHA-256. Después de guardar se consulta la tarea y se verifican los archivos finales. Un HTTP 200 o un clic no prueban una entrega.
 
-Los estados `new`, `draft`, `submitted` y `reopened` se obtienen de clases estructurales. Si faltan, se devuelve `unknown` con la evidencia original; esto ocurrió en la vista inicial del TP 6 sin entrega. El resultado de guardar puede ser `saved`, `submitted` o `uncertain`. Un recibo ya procesado no vuelve a guardar automáticamente.
+Los estados `new`, `draft`, `submitted` y `reopened` se obtienen de clases estructurales. Sin entrega, Moodle deja la celda de estado sin clase propia: se devuelve `new` si no hay archivos y la fila de calificación trae `submissionnotgraded` o `submissiongraded`, comprobado el 4 de noviembre de 2026 en tareas reales calificadas y sin calificar. Si faltan esas señales o se contradicen, se devuelve `unknown` con la evidencia original. El resultado de guardar puede ser `saved`, `submitted` o `uncertain`. Un recibo ya procesado no vuelve a guardar automáticamente.
 
 Cada POST de escritura se intenta una sola vez. Ante pérdida de respuesta se reconcilia leyendo el estado; si sigue incierto, no se reenvía. HTTP 429 se informa sin repetir la escritura. Las lecturas GET admiten hasta dos esperas acotadas según Retry-After. Durante el diagnóstico hubo 429 incluso en consultas del selector; no se atribuyeron todos a un único campo o encabezado.
 
 ## Verificación real completada
 
-El usuario autorizó expresamente cargar y guardar una entrega sintética en el **TP 6 de Análisis Numérico**, confirmó que Guardar envía la entrega y pidió no hacer commits hasta verificarla. También indicó que puede deshacer la prueba; no se retiró automáticamente.
+El usuario autorizó expresamente cargar y guardar una entrega sintética en el **TP 6 de Análisis Numérico**, confirmó que Guardar envía la entrega y pidió no hacer commits hasta verificarla. También indicó que podía deshacer la prueba; no se retiró automáticamente. El usuario la retiró después y el 4 de noviembre de 2026 la tarea figuraba sin entrega.
 
 La prueba se ejecutó mediante las herramientas MCP el 31 de octubre de 2026, con curso `7478` y actividad `455726`. Tras los HTTP 429 del diagnóstico, se mantuvo una sesión preparada, se esperaron 90 segundos y se realizó una única carga:
 
@@ -80,7 +80,7 @@ La prueba se ejecutó mediante las herramientas MCP el 31 de octubre de 2026, co
 - `submit_assignment(finalize=False)`: estado **`submitted`**, `files_verified=true` y evidencia **«Submitted for grading»**.
 - Una consulta posterior independiente dentro del mismo proceso confirmó el archivo y el estado enviado.
 
-La pausa pertenece a esta comprobación; no se afirma que 90 segundos resuelvan cualquier límite ni se incorporó un reenvío automático de escrituras. La prueba permanece en el campus. No se hicieron commits. Borradores y confirmaciones adicionales se verificaron en fixtures, no en esta tarea real.
+La pausa pertenece a esta comprobación; no se afirma que 90 segundos resuelvan cualquier límite ni se incorporó un reenvío automático de escrituras. No se hicieron commits. Borradores y confirmaciones adicionales se verificaron en fixtures, no en esta tarea real.
 
 ## Código y controles locales
 
