@@ -49,7 +49,7 @@ Hay **diez herramientas registradas**:
 | `list_monthly_activities` | Implementada y verificada, incluido filtro de vencimientos/cierres. | Consulta un mes; no determina qué trabajos siguen pendientes ni descubre actividades sin evento. |
 | `get_course_resources` | Implementada; Análisis Numérico devolvió 189 registros de enlaces y alcance completo. | `complete` se refiere a su recorrido documentado; no incluye todos los contenidos de foros, intentos o libros. `onetopic` y `resource` con `forceview` requieren validación real integral. |
 | `download_resources` | Implementada para cualquier tipo; tres PDF de Libros descargados y comprobados. | Selección de 1 a 10 enlaces de un módulo por llamada, mismo origen, sin redirecciones ni sincronización incremental. La prueba real citada es de PDF; otros tipos tienen pruebas locales. |
-| `get_submission_status` | Implementada y verificada en TP 6. | Estado de una tarea y archivos; no ofrece un detalle completo de consigna, plazos, restricciones o devolución. |
+| `get_submission_status` | Implementada y verificada en TP 6; `new` sin entrega comprobado el 4 de noviembre de 2026. | Estado de una tarea y archivos; no ofrece un detalle completo de consigna, plazos, restricciones o devolución. |
 | `prepare_submission` | Implementada, exclusivamente local. | No consulta si el campus admite esos archivos; los límites reales se validan durante la carga. |
 | `upload_files` | Implementada y verificada con un TXT sintético de 125 bytes en TP 6. | Solo flujo académico `assign`; rechaza entregas existentes. Recibo temporal de 30 minutos en el mismo proceso. |
 | `submit_assignment` | Guardado y estado `submitted` verificados en TP 6, con bytes comprobados. | Borradores y confirmación adicional se probaron localmente; faltan otras configuraciones reales. |
@@ -131,6 +131,7 @@ La auditoría documental anterior citaba **138 pruebas locales** y **3 integraci
 
 - [ ] **F14 — Leer contenido de páginas, etiquetas y secciones.** **P1 · Parcial.**
   - Ofrecer texto o Markdown de materiales publicados como HTML, conservando títulos y enlaces. El inventario actual devuelve enlaces, no un lector de contenido.
+  - Evidencia (4 de noviembre de 2026, Probabilidad y Estadística): la portada `onetopic` usa un iframe de `view.genially.com` como menú, pero el cronograma es una tabla de Moodle en una etiqueta (`#module-480344`, `section=1`), legible desde el DOM. Decisión del usuario: ignorar Genially por completo, porque los enlaces de la barra lateral llevan a las mismas secciones del campus. El inventario solo devuelve el inicio truncado del nombre de esa etiqueta.
   - **Cierre:** salida legible, con fuente y límites explícitos; conserva la relación con su sección y trata el contenido como datos externos.
 
 - [ ] **F15 — Ampliar el descubrimiento de adjuntos por módulo.** **P2 · Parcial.**
@@ -281,6 +282,12 @@ La auditoría documental anterior citaba **138 pruebas locales** y **3 integraci
   - Documentar qué campos son estables, cómo se agregan capacidades y cómo se anuncian cambios incompatibles. Conservar respuestas tipadas y anotaciones coherentes con los efectos reales.
   - Primer cambio incompatible registrado (F45, 1 de noviembre de 2026): `get_server_info` dejó de devolver `stage` y `campus_features_ready`. Los consumidores deben leer `capabilities` y `registered_tools`.
   - **Cierre:** ejemplos y contratos públicos coinciden con el servidor; agregar una capacidad no rompe consumidores existentes sin una migración documentada.
+
+- [ ] **F49 — Mantener una guía local del año y de sus fechas.** **P1 · Parcial.**
+  - La skill `/campus-init` (`.claude/skills/campus-init/`) recorre las materias de un año y genera `.local/campus/<año>/guia.md` y `fechas.json`. Extrae fechas de cronogramas y enunciados con su origen y confianza, conserva los conflictos entre fuentes y borra cada documento tras leerlo, solo por la ruta devuelta por `download_resources`.
+  - **Evidencia:** 4 de noviembre de 2026, helper `campus_docs.py` probado con archivos sintéticos: extracción de XLSX, DOCX y PPTX, formatos no admitidos y rechazo de borrados fuera de `downloads/`, por symlink o por `..`. La extracción de PDF y XLSX se aplicó en forma manual sobre cronogramas reales durante una consulta previa. Primera ejecución real el mismo día con `/campus-init 2026`, solo lectura: 13 materias, 55 fechas, 18 documentos PDF y XLSX leídos y borrados, 15 vacíos declarados y ningún temporal restante. Detectó el día de semana erróneo de Seminario y que el enunciado del TP 6 confirma el campus frente al cronograma. Probabilidad, en formato `onetopic`, quedó con `complete=false` por un enlace externo pendiente.
+  - **Pendiente:** comprobar una consulta posterior resuelta con la guía, lectura de avisos y etiquetas (F32, F14) y lectura de documentos en memoria desde el MCP, sin escribir en disco.
+  - **Cierre:** una ejecución real genera ambos archivos, declara sus vacíos, no deja documentos temporales y una consulta posterior se resuelve usando la guía.
 
 ## Orden recomendado
 

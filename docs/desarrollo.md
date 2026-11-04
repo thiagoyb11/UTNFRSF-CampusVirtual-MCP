@@ -142,6 +142,8 @@ La incorporación de `list_courses` aprobó 145 pruebas locales, con 13 integrac
 
 La comprobación real optativa usa el cliente oficial de MCP y el entrypoint stdio: `/opt/homebrew/bin/python3 .local/check_courses_mcp.py`, cuando ese diagnóstico local esté disponible. Lee `.env` en el servidor y consulta dos veces `list_courses`, sin escrituras académicas. No integra la suite por defecto. Ejecutarlo desde una terminal con restricciones puede impedir iniciar Lightpanda; esta prueba se completó fuera del sandbox con autorización. Exponer la herramienta evita el helper de terminal en el uso habitual, pero no elimina las restricciones del entorno donde se lance un servidor.
 
+La skill `/campus-init [año]` genera una guía local en `.local/campus/<año>/`, con solo lecturas del campus. Descarga los cronogramas y enunciados de a uno, extrae su texto con `.claude/skills/campus-init/scripts/campus_docs.py` y los borra. El helper usa la biblioteca estándar y `pdftotext`; `cleanup` solo acepta archivos dentro de `downloads/`. El seguimiento está en F49 del [inventario](funcionalidades-pendientes.md).
+
 Los controles de código se pueden ejecutar directamente:
 
 ```bash
