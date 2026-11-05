@@ -27,12 +27,16 @@ from utnfrsf_campus_mcp.services.authentication import AuthenticationService
 
 
 class CalendarService:
-    def __init__(self, settings: Settings, session: CampusSession, authentication: AuthenticationService) -> None:
+    def __init__(
+        self, settings: Settings, session: CampusSession, authentication: AuthenticationService
+    ) -> None:
         self._settings = settings
         self._session = session
         self._authentication = authentication
 
-    async def list_monthly_activities(self, year: int | None = None, month: int | None = None, deadlines_only: bool = False) -> MonthlyActivities:
+    async def list_monthly_activities(
+        self, year: int | None = None, month: int | None = None, deadlines_only: bool = False
+    ) -> MonthlyActivities:
         # También se valida al invocar el servicio directamente, antes de acceder a la red.
         if (year is None) != (month is None) or (
             year is not None
@@ -80,7 +84,9 @@ class CalendarService:
                         page, year, month, self._settings.navigation_timeout_ms
                     )
                     await self._require_session(page)
-                    activities = parse_month(payload, year, month, zone, deadlines_only=deadlines_only)
+                    activities = parse_month(
+                        payload, year, month, zone, deadlines_only=deadlines_only
+                    )
                     start, _ = month_bounds(year, month, zone)
                     warnings = [
                         "El calendario no confirma si una actividad está entregada o pendiente. "
