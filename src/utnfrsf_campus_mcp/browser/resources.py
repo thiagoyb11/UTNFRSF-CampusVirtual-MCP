@@ -93,6 +93,16 @@ PAGE_CONTENT_SCRIPT = r"""(() => {
         access_denied: !!main?.querySelector('.alert-danger, .errorbox')};
 })()"""
 
+# Descripción de mod/folder: algunas cátedras publican ahí el temario, sin archivos.
+FOLDER_CONTENT_SCRIPT = r"""(() => {
+    const main = document.querySelector('#region-main');
+    const intro = main?.querySelector('#intro.activity-description');
+    return {url: location.href, body: document.body.id, course_id: M.cfg.courseId,
+        name: main?.querySelector('h2')?.textContent?.trim() || null,
+        html: intro ? intro.innerHTML.slice(0, 500000) : '',
+        access_denied: !!main?.querySelector('.alert-danger, .errorbox')};
+})()"""
+
 # GET de páginas conocidas: no sigue redirecciones (tampoco a un origen externo),
 # no descarga binarios ni ejecuta el HTML recibido. forceview es el parámetro de lectura
 # de mod/resource/view.php de Moodle para obtener el enlace incluso en modo download.

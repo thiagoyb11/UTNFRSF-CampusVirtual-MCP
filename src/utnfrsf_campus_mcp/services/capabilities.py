@@ -23,6 +23,7 @@ PENDING_FEATURES_DOC = "docs/funcionalidades-pendientes.md"
 # descargas y entregas documentada en docs/.
 _CAMPUS_CHECK_2026_10_31 = date(2026, 10, 31)
 _CAMPUS_CHECK_2026_11_04 = date(2026, 11, 4)
+_CAMPUS_CHECK_2026_11_05 = date(2026, 11, 5)
 
 
 CAPABILITIES: tuple[Capability, ...] = (
@@ -112,6 +113,16 @@ CAPABILITIES: tuple[Capability, ...] = (
         verified_on=_CAMPUS_CHECK_2026_11_04,
         scope="Texto de un módulo page de una materia, como Markdown.",
         pending=["No lee otros módulos HTML, como libros o lecciones."],
+        docs="docs/recursos.md",
+    ),
+    Capability(
+        tool="get_folder_content",
+        feature_ids=["F14"],
+        effect="campus_read",
+        status="campus_verified",
+        verified_on=_CAMPUS_CHECK_2026_11_05,
+        scope="Descripción de un módulo folder, como Markdown.",
+        pending=["No lista archivos: están en get_course_resources."],
         docs="docs/recursos.md",
     ),
     Capability(

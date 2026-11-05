@@ -50,6 +50,7 @@ Hay **diez herramientas registradas**:
 | `get_course_resources` | Implementada; Análisis Numérico devolvió 189 registros de enlaces y alcance completo. | `complete` se refiere a su recorrido documentado; no incluye todos los contenidos de foros, intentos o libros. `onetopic` y `resource` con `forceview` requieren validación real integral. |
 | `get_section_content` | Implementada y verificada en `topics` y `onetopic`. | Texto de una sección por llamada; no sigue enlaces. |
 | `get_page_content` | Implementada y verificada en dos páginas reales. | Solo módulos `page`. |
+| `get_folder_content` | Implementada y verificada en tres carpetas reales. | Solo la descripción; los archivos están en el inventario. |
 | `list_forum_discussions` | Implementada y verificada en foros de Avisos. | Detecta paginación, pero no la recorre. |
 | `get_forum_discussion` | Implementada y verificada con mensajes anidados. | Adjuntos sin verificar en un caso real. |
 | `download_resources` | Implementada para cualquier tipo; tres PDF de Libros descargados y comprobados. | Selección de 1 a 10 enlaces de un módulo por llamada, mismo origen, sin redirecciones ni sincronización incremental. La prueba real citada es de PDF; otros tipos tienen pruebas locales. |
@@ -136,7 +137,7 @@ La auditoría documental anterior citaba **138 pruebas locales** y **3 integraci
 - [x] **F14 — Leer contenido de páginas, etiquetas y secciones.** **P1 · Implementada y verificada.**
   - Ofrecer texto o Markdown de materiales publicados como HTML, conservando títulos y enlaces. El inventario actual devuelve enlaces, no un lector de contenido.
   - Evidencia (4 de noviembre de 2026, Probabilidad y Estadística): la portada `onetopic` usa un iframe de `view.genially.com` como menú, pero el cronograma es una tabla de Moodle en una etiqueta (`#module-480344`, `section=1`), legible desde el DOM. Decisión del usuario: ignorar Genially por completo, porque los enlaces de la barra lateral llevan a las mismas secciones del campus. El inventario solo devuelve el inicio truncado del nombre de esa etiqueta.
-  - Implementación (4 de noviembre de 2026): `get_section_content` y `get_page_content` devuelven Markdown con fuente, sección, módulo, enlaces y advertencias; el conversor está en `parsers/content.py`. Evidencia real en `onetopic` y `topics`, con detalle en [recursos](recursos.md).
+  - Implementación (4 de noviembre de 2026): `get_section_content`, `get_page_content` y `get_folder_content` (5 de noviembre) devuelven Markdown con fuente, sección o módulo, enlaces y advertencias; el conversor está en `parsers/content.py`. Evidencia real en `onetopic` y `topics`, con detalle en [recursos](recursos.md).
   - **Variantes pendientes:** otros módulos HTML, como libros o lecciones, y el nombre de sección en `onetopic`.
   - **Cierre satisfecho:** salida legible, con fuente y límites explícitos; conserva la relación con su sección y trata el contenido como datos externos.
 

@@ -9,6 +9,7 @@ from lightpanda import AsyncSession, LightpandaError
 
 from utnfrsf_campus_mcp.browser.resources import (
     COURSE_CONTENT_SCRIPT,
+    FOLDER_CONTENT_SCRIPT,
     PAGE_CONTENT_SCRIPT,
     SECTION_CONTENT_SCRIPT,
     read_module_links,
@@ -310,15 +311,24 @@ class ResourceService:
 
     async def get_page_content(self, course_id: int, module_id: int) -> PageContent:
         """Lee un módulo page de la asignatura indicada; no sigue enlaces."""
+        return await self._module_text(course_id, module_id, "page", PAGE_CONTENT_SCRIPT)
+
+    async def get_folder_content(self, course_id: int, module_id: int) -> PageContent:
+        """Lee la descripción de un módulo folder; sus archivos están en el inventario."""
+        return await self._module_text(course_id, module_id, "folder", FOLDER_CONTENT_SCRIPT)
+
+    async def _module_text(
+        self, course_id: int, module_id: int, kind: str, script: str
+    ) -> PageContent:
         if type(module_id) is not int or module_id <= 0:
             raise CourseError("RESOURCES_INVALID_MODULE", "Indicá un module_id entero positivo.")
         course = await self.find_course(course_id)
-        url = urljoin(CAMPUS_BASE_URL, f"mod/page/view.php?id={module_id}")
+        url = urljoin(CAMPUS_BASE_URL, f"mod/{kind}/view.php?id={module_id}")
         try:
             with fail_after(QUERY_TIMEOUT_SECONDS):
                 async with self._session.acquire() as page:
                     await self.open_page(page, url)
-                    data = await page.evaluate(script=PAGE_CONTENT_SCRIPT)
+                    data = await page.evaluate(script=script)
                     await self.require_session(page)
         except TimeoutError:
             raise CourseError("RESOURCES_TIMEOUT", "Se agotó el tiempo de consulta.") from None
@@ -328,16 +338,18 @@ class ResourceService:
             raise invalid_resources()
         if data.get("access_denied"):
             raise CourseError("RESOURCES_ACCESS_DENIED", "El campus denegó el acceso a la página.")
-        if data.get("body") != "page-mod-page-view" or str(data.get("course_id")) != str(course_id):
+        if data.get("body") != f"page-mod-{kind}-view" or str(data.get("course_id")) != str(
+            course_id
+        ):
             raise CourseError(
-                "RESOURCES_MODULE_NOT_FOUND", "El módulo no es una página de la materia."
+                "RESOURCES_MODULE_NOT_FOUND", "El módulo no es de ese tipo o de la materia."
             )
         if data.get("html") is None:
             raise invalid_resources()
         parsed = html_to_markdown(data["html"], url)
         warnings = []
         if parsed.truncated:
-            warnings.append("CONTENT_TRUNCATED: La página superó el límite de texto.")
+            warnings.append("CONTENT_TRUNCATED: El módulo superó el límite de texto.")
         if parsed.embeds:
             warnings.append(
                 "CONTENT_EMBEDS_OMITTED: Hay contenido embebido de " + ", ".join(parsed.embeds)

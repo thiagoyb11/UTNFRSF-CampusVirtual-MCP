@@ -193,7 +193,7 @@ class SectionContent(BaseModel):
 
 
 class PageContent(BaseModel):
-    """Texto de un módulo page del campus."""
+    """Texto de un módulo page o de la descripción de un folder."""
 
     course: Course
     module_id: int

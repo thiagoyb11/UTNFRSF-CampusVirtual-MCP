@@ -12,7 +12,7 @@ Su objetivo es facilitar las tareas cotidianas del estudiante desde un asistente
 
 `get_course_resources(course_id)` lista los enlaces de una materia, incluidas tareas, archivos y materiales de carpetas. Recorre secciones y devuelve el alcance de la consulta. Ver [uso y límites](docs/recursos.md); verificada en Análisis Numérico (`topics`); queda pendiente la validación integral de `onetopic`.
 
-`get_section_content(course_id, section)` y `get_page_content(course_id, module_id)` leen como Markdown el texto publicado en secciones y páginas, incluidas tablas como los cronogramas.
+`get_section_content(course_id, section)`, `get_page_content(course_id, module_id)` y `get_folder_content(course_id, module_id)` leen como Markdown el texto publicado en secciones, páginas y descripciones de carpetas, incluidas tablas como los cronogramas.
 
 `download_resources(course_id, module_id, urls)` descarga archivos de cualquier tipo del módulo indicado a `downloads/`, valida la transferencia y devuelve rutas, tamaños y hashes. Ver [uso y límites](docs/descargas.md).
 

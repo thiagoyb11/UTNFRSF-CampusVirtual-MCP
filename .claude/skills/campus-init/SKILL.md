@@ -45,6 +45,7 @@ Guardá para cada materia:
 
 - Secciones, y tareas y cuestionarios con su ID de módulo.
 - Materiales de parciales, carpetas de trabajos prácticos y foros de avisos, con su `module_id`.
+- Carpetas cuyo nombre mencione parciales, material, cronograma o fechas: leé su descripción con `get_folder_content(course_id, module_id)`, aunque no tengan archivos. Algunas cátedras publican ahí temarios y fechas. Anotá en la guía qué temario contiene cada una.
 - Etiquetas de `unlinked_activities`: llamá a `get_section_content(course_id, section)` una vez por cada sección que las tenga y buscá fechas en sus bloques, sobre todo en tablas. Usá el texto, no el nombre: puede estar desactualizado. Registralas como fuente `campus`, con confianza `media`.
 - Módulos con `availability` del tipo "You belong to <grupo>": indican comisiones ajenas.
 

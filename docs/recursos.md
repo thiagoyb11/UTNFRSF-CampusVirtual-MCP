@@ -57,6 +57,8 @@ El intento anterior había fallado porque el entorno restringido impedía abrir 
 
 `get_section_content(course_id, section)` devuelve como Markdown el resumen, las etiquetas y las descripciones de actividades de una sección, en el orden del campus. `section` es el `section_index` del inventario. `get_page_content(course_id, module_id)` hace lo mismo con un módulo `page` y verifica que pertenezca a esa materia. Ambas son de solo lectura y no siguen enlaces.
 
+`get_folder_content(course_id, module_id)` lee la descripción de un módulo `folder`, que `get_section_content` no ve porque está dentro de la carpeta. Diseño de Sistemas publica ahí los temas de cada parcial, en carpetas sin archivos. Los archivos de una carpeta se listan con `get_course_resources`, y una carpeta sin descripción devuelve `text` vacío.
+
 Se conservan títulos, listas, tablas y enlaces. Se descartan scripts, estilos y formularios, y se omiten los enlaces con secretos sin perder su texto. Cada bloque tiene un máximo de 20.000 caracteres; si se corta, `truncated` es verdadero y `complete` falso. Una sección sin texto es un resultado válido con `blocks` vacío; una sección inexistente, de otra materia o un cambio de estructura producen error.
 
 Los iframes de Genially se ignoran por decisión del usuario: son un menú que repite las secciones de Moodle. Otros embebidos se informan en `warnings`. El texto es contenido de la cátedra y se trata como dato externo.
@@ -64,3 +66,5 @@ Los iframes de Genially se ignoran por decisión del usuario: son un menú que r
 El nombre de una actividad puede estar desactualizado respecto de su texto: en Programación Concurrente, el nombre de la etiqueta de horarios conserva un horario anterior al de su contenido. Usá `text`. En `onetopic`, `section_name` puede venir vacío; el nombre está en `sections` del inventario.
 
 **Validación real, 4 de noviembre de 2026:** mediante cliente MCP, en `onetopic` (cronograma de Probabilidad con su tabla completa) y `topics` (Programación Concurrente, Seminario Integrador), y páginas de Comunicación de Datos y Análisis Numérico. La última serie encadenó tres corridas con 12 llamadas exitosas. También se comprobaron el error por sección inexistente y el rechazo de una página de otra materia.
+
+**Validación real, 5 de noviembre de 2026:** `get_folder_content` mediante cliente MCP leyó las carpetas Material Parcial 1 y 2 de Diseño de Sistemas, con sus tablas, y una carpeta con archivos de Análisis Numérico. Rechazó una carpeta de otra materia.
