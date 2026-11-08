@@ -41,6 +41,7 @@ class AuthenticationService:
 
     async def login(self) -> LoginResult:
         """Lee credenciales privadas; solo reintenta un límite de solicitudes explícito."""
+        # Sin credenciales en .env no se abre el navegador: se informa cómo configurarlas.
         username, password = self._settings.username, self._settings.password
         if (
             username is None
@@ -79,6 +80,8 @@ class AuthenticationService:
                         except _RateLimited:
                             pass
 
+                        # Solo se llega acá ante un 429. Si quedan intentos, se espera con
+                        # backoff exponencial (tope 30 s) más un pequeño margen aleatorio.
                         if attempt == self._settings.login_max_attempts:
                             raise LoginError(
                                 "LOGIN_RATE_LIMITED",
@@ -113,6 +116,7 @@ class AuthenticationService:
             wait_until="domcontentloaded",
         )
         self._check_http(result.http_status)
+        # Si la sesión ya estaba iniciada, Moodle lo indica en la propia página de login.
         state = await self._read_state(page)
         if state.get("authenticated"):
             return LoginResult(
@@ -121,6 +125,8 @@ class AuthenticationService:
                 message="La sesión ya está autenticada en el campus.",
             )
 
+        # Identifica el formulario de acceso y busca el único botón de envío que pertenece a
+        # él y apunta a la página de login; si hay cero o varios, no se envía nada.
         form = select_login_form(await page.detect_forms(), self._login_url)
         form_selector = await self._selector(page, form.form_id)
         buttons = await page.find_element(role="button")
@@ -139,6 +145,8 @@ class AuthenticationService:
 
         button_id, button_selector = matching[0]
 
+        # Tras escribir cada campo se vuelve a comprobar el formulario: si un script de la
+        # página cambió su destino, se aborta antes de enviar credenciales.
         # Completa el nombre de usuario
         await page.fill(backend_node_id=form.username_id, value=username)
         await self._require_safe_form(page, form_selector, button_selector)
@@ -163,6 +171,7 @@ class AuthenticationService:
             # Una espera agotada no autoriza a volver a enviar. Se inspecciona
             # el estado final y se falla de forma explícita si no hay evidencia.
 
+        # Resultado final: sesión iniciada, credenciales rechazadas o estado no verificable.
         state = await self._read_state(page)
         if state.get("authenticated"):
             return LoginResult(attempts=attempt, message="Sesión autenticada en el campus.")
@@ -178,12 +187,15 @@ class AuthenticationService:
 
     @staticmethod
     def _check_http(status: int | None) -> None:
+        # 429 dispara un reintento controlado; cualquier otro error HTTP corta el login.
         if status == 429:
             raise _RateLimited
         if status is not None and status >= 400:
             raise LoginError("LOGIN_HTTP_ERROR", f"El campus respondió con HTTP {status}.")
 
     async def _read_state(self, page: AsyncSession) -> dict:
+        # Lee el estado de la página y detecta límites de solicitudes o salidas del campus
+        # (por ejemplo, un proveedor de identidad externo que requiera interacción).
         state = await page.evaluate(script=LOGIN_PAGE_STATE_SCRIPT)
         if not isinstance(state, dict):
             raise LoginError("LOGIN_UNVERIFIED", "No se pudo inspeccionar el estado del acceso.")
@@ -198,6 +210,7 @@ class AuthenticationService:
 
     @staticmethod
     async def _selector(page: AsyncSession, node_id: int) -> str:
+        # Convierte un ID de nodo del navegador en un selector CSS para usarlo desde scripts.
         details = await page.node_details(backend_node_id=node_id)
         selector = details.get("selector") if isinstance(details, dict) else None
         if not isinstance(selector, str) or not selector:
@@ -207,6 +220,8 @@ class AuthenticationService:
         return selector
 
     async def _form_is_safe(self, page: AsyncSession, form: str, button: str) -> bool:
+        # Seguro significa: el botón está dentro del formulario, es de tipo submit, no tiene
+        # un formaction propio y el formulario hace POST a la página de login del campus.
         # Solo devuelve un booleano. No lee valores de inputs ni tokens ocultos.
         script = f"""(() => {{
             const form = document.querySelector({json.dumps(form)});
@@ -225,6 +240,7 @@ class AuthenticationService:
         return await page.evaluate(script=script) is True
 
     async def _require_safe_form(self, page: AsyncSession, form: str, button: str) -> None:
+        # Variante que falla en lugar de devolver False, para usar entre pasos del llenado.
         if not await self._form_is_safe(page, form, button):
             raise LoginError(
                 "LOGIN_FORM_CHANGED", "El formulario cambió antes del envío; se detuvo el acceso."

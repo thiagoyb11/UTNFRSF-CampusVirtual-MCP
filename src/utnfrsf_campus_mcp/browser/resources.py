@@ -4,6 +4,9 @@ import json
 
 from lightpanda import AsyncSession
 
+# Snapshot de una página de curso (course/view.php): secciones con sus actividades y enlaces,
+# formato (topics u onetopic) y navegación hacia otras secciones (pestañas y barra lateral),
+# que el servicio usa para recorrer las secciones que no vienen en el DOM inicial.
 # Solo se lee contenido académico y navegación de secciones. Sin valores de formularios,
 # identidad ni configuración privada de Moodle. No se pulsan controles de actividades.
 COURSE_CONTENT_SCRIPT = r"""(() => {
@@ -153,4 +156,5 @@ _MODULE_CONTENT_SCRIPT = r"""return await (async () => {
 
 async def read_module_links(page: AsyncSession, url: str) -> object:
     """Lee solo una URL interna validada por el servicio; no expone JS al cliente MCP."""
+    # json.dumps convierte la URL en un literal de cadena JavaScript con escapes seguros.
     return await page.evaluate(script=_MODULE_CONTENT_SCRIPT.replace("__URL__", json.dumps(url)))

@@ -16,6 +16,7 @@ from utnfrsf_campus_mcp.models import (
 )
 from utnfrsf_campus_mcp.services.submissions import SubmissionService
 
+# Tipos de parámetro compartidos: IDs positivos y una lista acotada de rutas locales.
 Id = Annotated[int, Field(gt=0, description="ID de la materia o módulo, según el parámetro.")]
 Files = Annotated[
     list[str],
@@ -28,6 +29,7 @@ Files = Annotated[
 
 
 def register_submissions(server: MCPServer, service: SubmissionService) -> None:
+    # Dos perfiles de anotación: consulta del estado (lectura) y carga/guardado (escritura).
     read = ToolAnnotations(
         read_only_hint=True, destructive_hint=False, idempotent_hint=True, open_world_hint=True
     )
@@ -35,6 +37,8 @@ def register_submissions(server: MCPServer, service: SubmissionService) -> None:
         read_only_hint=False, destructive_hint=False, idempotent_hint=False, open_world_hint=True
     )
 
+    # Envoltorio común: traduce errores de dominio a errores MCP. Ante un fallo inesperado
+    # avisa que hay que consultar el estado antes de repetir, porque pudo haberse escrito algo.
     async def call(method, *args):
         try:
             return await method(*args)
@@ -46,6 +50,7 @@ def register_submissions(server: MCPServer, service: SubmissionService) -> None:
                 "verificá el estado antes de repetir escrituras."
             ) from None
 
+    # Paso 1 (local): valida archivos y calcula hashes; no toca el campus (open_world_hint=False).
     @server.tool(
         annotations=ToolAnnotations(
             read_only_hint=True, destructive_hint=False, idempotent_hint=True, open_world_hint=False
@@ -62,11 +67,13 @@ def register_submissions(server: MCPServer, service: SubmissionService) -> None:
                 "UPLOAD_LOCAL_FILE_ERROR: No se pudieron preparar los archivos."
             ) from None
 
+    # Consulta del estado actual de la entrega; se usa antes y después de escribir.
     @server.tool(annotations=read)
     async def get_submission_status(course_id: Id, activity_id: Id) -> SubmissionStatus:
         """Consulta estado y archivos de una tarea assign, conservando la evidencia original."""
         return await call(service.get_submission_status, course_id, activity_id)
 
+    # Paso 2: sube los archivos al área temporal de Moodle y devuelve un recibo (upload_id).
     @server.tool(annotations=write)
     async def upload_files(course_id: Id, activity_id: Id, files: Files) -> UploadedFiles:
         """Carga y verifica archivos en el área temporal de una tarea abierta; devuelve un recibo.
@@ -77,6 +84,7 @@ def register_submissions(server: MCPServer, service: SubmissionService) -> None:
         """
         return await call(service.upload_files, course_id, activity_id, files)
 
+    # Paso 3: guarda (y opcionalmente envía) la entrega usando el recibo del paso 2.
     @server.tool(annotations=write)
     async def submit_assignment(
         upload_id: str, finalize: bool = False, accept_statement: bool = False

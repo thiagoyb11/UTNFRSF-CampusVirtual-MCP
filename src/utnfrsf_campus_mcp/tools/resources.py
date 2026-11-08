@@ -11,6 +11,7 @@ from utnfrsf_campus_mcp.errors import CourseError, LoginError
 from utnfrsf_campus_mcp.models import CourseResources, PageContent, SectionContent
 from utnfrsf_campus_mcp.services.resources import ResourceService
 
+# Las cuatro herramientas de este módulo solo leen el campus.
 READ_ONLY = ToolAnnotations(
     read_only_hint=True,
     destructive_hint=False,
@@ -20,6 +21,7 @@ READ_ONLY = ToolAnnotations(
 
 
 def register_resources(server: MCPServer, service: ResourceService) -> None:
+    # Inventario completo: punto de partida para obtener IDs de secciones, módulos y archivos.
     @server.tool(annotations=READ_ONLY)
     async def get_course_resources(
         course_id: Annotated[int, Field(gt=0, description="ID de la asignatura de Grado.")],
@@ -41,6 +43,7 @@ def register_resources(server: MCPServer, service: ResourceService) -> None:
         except Exception:
             raise ToolError("RESOURCES_INTERNAL_ERROR: No se pudo completar la consulta.") from None
 
+    # Texto publicado en una sección (resumen y etiquetas), con el índice del inventario.
     @server.tool(annotations=READ_ONLY)
     async def get_section_content(
         course_id: Annotated[int, Field(gt=0, description="ID de la asignatura de Grado.")],
@@ -61,6 +64,7 @@ def register_resources(server: MCPServer, service: ResourceService) -> None:
         except Exception:
             raise ToolError("RESOURCES_INTERNAL_ERROR: No se pudo completar la consulta.") from None
 
+    # Contenido de un módulo "page" (texto que la cátedra escribe directamente en Moodle).
     @server.tool(annotations=READ_ONLY)
     async def get_page_content(
         course_id: Annotated[int, Field(gt=0, description="ID de la asignatura de Grado.")],
@@ -79,6 +83,7 @@ def register_resources(server: MCPServer, service: ResourceService) -> None:
         except Exception:
             raise ToolError("RESOURCES_INTERNAL_ERROR: No se pudo completar la consulta.") from None
 
+    # Descripción de una carpeta; los archivos que contiene se listan en el inventario.
     @server.tool(annotations=READ_ONLY)
     async def get_folder_content(
         course_id: Annotated[int, Field(gt=0, description="ID de la asignatura de Grado.")],

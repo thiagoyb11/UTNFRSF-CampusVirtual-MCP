@@ -21,6 +21,7 @@ class LightpandaBrowser:
     @asynccontextmanager
     async def session(self) -> AsyncIterator[AsyncSession]:
         """Crea el proceso y la sesión solo cuando un servicio los solicita."""
+        # Sin binario configurado, el SDK usa el Lightpanda que encuentre instalado.
         binary = self._settings.lightpanda_binary
         async with AsyncBrowser(
             binary=str(binary) if binary is not None else None,
@@ -35,5 +36,6 @@ class LightpandaBrowser:
                 str(self._settings.navigation_timeout_ms),
             ),
         ) as browser:
+            # Una única pestaña por proceso; al salir del bloque se cierran pestaña y proceso.
             async with browser.session() as page:
                 yield page

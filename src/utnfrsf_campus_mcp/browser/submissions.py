@@ -1,5 +1,12 @@
 """Snapshot acotado del estado y de acciones observadas de una tarea Moodle."""
 
+# Script que se ejecuta dentro de la página de una tarea (mod/assign/view.php).
+# Devuelve solo lo necesario para decidir el flujo de entrega:
+# - actions: botones GET de Moodle (editar, enviar, enviar para calificar) con su URL completa.
+# - rows: las primeras filas de la tabla de estado, para leer si hay borrador o entrega.
+# - files: archivos ya adjuntos a la entrega del alumno.
+# - course_id y account_id: para confirmar materia y cuenta antes de escribir.
+# No lee valores de formularios ni datos personales fuera de esa tabla.
 SUBMISSION_STATE_SCRIPT = r"""(() => {
     const main = document.querySelector('#region-main');
     if (!main) return null;

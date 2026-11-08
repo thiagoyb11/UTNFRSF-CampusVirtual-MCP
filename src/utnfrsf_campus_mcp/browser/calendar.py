@@ -75,6 +75,7 @@ return await new Promise(resolve => {
 });
 """
 
+# Únicos códigos que el script puede devolver; cualquier otro se trata como formato inválido.
 _MESSAGES = {
     "CALENDAR_API_UNAVAILABLE": "El campus no ofrece el repositorio de calendario compatible.",
     "CALENDAR_SESSION_EXPIRED": "La sesión venció. Volvé a ejecutar login antes de consultar.",
@@ -86,10 +87,12 @@ _MESSAGES = {
 
 async def read_calendar_month(page: AsyncSession, year: int, month: int, wait_ms: int) -> dict:
     """Una consulta de lectura para todo el mes, incluidos eventos plegados en el HTML."""
+    # year y month son enteros validados: reemplazarlos en el script no permite inyectar código.
     script = _MONTH_SCRIPT.replace("__YEAR__", str(year)).replace("__MONTH__", str(month))
     response = await page.evaluate(script=script, timeout=wait_ms)
     if not isinstance(response, dict):
         raise invalid_calendar()
+    # Error controlado del script: se traduce a un CalendarError con mensaje propio.
     if "error" in response:
         code = response["error"]
         if isinstance(code, str) and code in _MESSAGES:

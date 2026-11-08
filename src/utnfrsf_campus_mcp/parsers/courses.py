@@ -12,9 +12,13 @@ from utnfrsf_campus_mcp.parsers.login import same_origin
 _MY_COURSES = (
     '[data-block="navigation"] li.type_system:has(> p.tree_item > a[href$="/my/courses.php"])'
 )
+# Categorías que Moodle carga por AJAX y todavía no se cargaron: indican un listado incompleto.
 _PENDING_CATEGORIES = (
     'li[data-requires-ajax="true"]:not([data-loaded="true"]):not(.type_course, .type_course *)'
 )
+# Esquema de extracción declarativa de Lightpanda (page.extract): describe qué leer del
+# bloque de navegación sin ejecutar JavaScript propio. Devuelve la raíz My courses y, por cada
+# grupo (Grado, Ingreso, ...), su nombre, estado de carga y hasta 1001 materias con título y URL.
 DEGREE_COURSES_SCHEMA = {
     "navigation": {"selector": '[data-block="navigation"]', "attr": "data-block"},
     "roots": [{"selector": f"{_MY_COURSES} > p.tree_item > a[href]", "attr": "href"}],
@@ -47,6 +51,7 @@ DEGREE_COURSES_SCHEMA = {
 
 def parse_degree_courses(payload: Any) -> list[Course]:
     """Selecciona Grado y valida la extracción nativa sin ejecutar JavaScript propio."""
+    # Debe existir el bloque de navegación y una única raíz My courses del propio campus.
     if not isinstance(payload, dict) or payload.get("navigation") != "navigation":
         raise _unsupported_navigation()
     roots, groups = payload.get("roots"), payload.get("groups")
@@ -68,6 +73,7 @@ def parse_degree_courses(payload: Any) -> list[Course]:
     ]
     if len(degree) != 1:
         raise _unsupported_navigation()
+    # Si quedan ramas sin cargar, se falla: devolver una lista parcial parecería completa.
     if degree[0].get("pending") != [] or (
         degree[0].get("requires_ajax") == "true" and degree[0].get("loaded") != "true"
     ):
@@ -77,18 +83,21 @@ def parse_degree_courses(payload: Any) -> list[Course]:
         raise CourseError(
             "COURSES_INCOMPLETE", "No se pudo confirmar el listado completo de Grado."
         )
+    # El esquema pide 1001 materias: si llegan más de 1000, el límite se alcanzó y hay recorte.
     if len(items) > 1000:
         raise CourseError("COURSES_LIMIT_EXCEEDED", "Grado supera el límite de 1000 asignaturas.")
     courses: dict[int, Course] = {}
     for item in items:
         if not isinstance(item, dict):
             raise _invalid_course()
+        # Nombre completo del atributo title (o el texto visible) y URL de la materia.
         name, raw_url = item.get("name") or item.get("label"), item.get("url")
         if not isinstance(name, str) or not name.strip() or not isinstance(raw_url, str):
             raise _invalid_course()
         url = urljoin(CAMPUS_BASE_URL, raw_url)
         if not same_origin(url, CAMPUS_BASE_URL):
             raise _invalid_course()
+        # La URL tiene que ser course/view.php con un único id numérico positivo.
         parts = urlsplit(url)
         ids = parse_qs(parts.query).get("id", [])
         if (
@@ -99,18 +108,21 @@ def parse_degree_courses(payload: Any) -> list[Course]:
             or int(ids[0]) <= 0
         ):
             raise _invalid_course()
+        # Se reconstruye una URL canónica y se normalizan los espacios del nombre.
         course_id = int(ids[0])
         course = Course(
             id=course_id,
             name=" ".join(name.split()),
             url=urljoin(CAMPUS_BASE_URL, "course/view.php?" + urlencode({"id": course_id})),
         )
+        # Una materia repetida es válida solo si es idéntica; con datos distintos, es ambigua.
         if course_id in courses and courses[course_id] != course:
             raise _invalid_course()
         courses[course_id] = course
     return list(courses.values())
 
 
+# Fábricas de los dos errores del parser, para no repetir código y mensaje.
 def _invalid_course() -> CourseError:
     return CourseError(
         "COURSES_INVALID_COURSE", "Una asignatura no tiene nombre y enlace inequívocos."

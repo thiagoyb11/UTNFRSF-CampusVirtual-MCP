@@ -27,6 +27,8 @@ class ForumService:
         self._session = session
         self._resources = resources
 
+    # Paso común de las dos consultas: abrir la página del foro, extraer con el script y
+    # confirmar que la sesión siga activa. Traduce timeouts y fallos del navegador.
     async def _read(self, url: str, script: str) -> dict:
         try:
             with fail_after(QUERY_TIMEOUT_SECONDS):
@@ -45,11 +47,13 @@ class ForumService:
         return data
 
     async def list_discussions(self, course_id: int, forum_id: int) -> ForumDiscussions:
+        # Validar el ID antes de cualquier acceso a red.
         if type(forum_id) is not int or forum_id <= 0:
             raise CourseError("FORUM_INVALID_ID", "Indicá un forum_id entero positivo.")
         course = await self._resources.find_course(course_id)
         url = urljoin(CAMPUS_BASE_URL, f"mod/forum/view.php?id={forum_id}")
         data = await self._read(url, FORUM_LIST_SCRIPT)
+        # La página debe ser un foro, de esta materia y con el mismo id (sin redirecciones).
         query = parse_qs(urlsplit(str(data.get("url"))).query)
         if (
             data.get("body") != "page-mod-forum-view"
@@ -57,6 +61,8 @@ class ForumService:
             or query.get("id") != [str(forum_id)]
         ):
             raise CourseError("FORUM_NOT_FOUND", "El módulo no es un foro de la asignatura.")
+        # Sin filas solo es válido si Moodle muestra el aviso de foro vacío; si no, es un
+        # formato desconocido y no se devuelve una lista vacía como si fuera un éxito.
         rows = data.get("discussions")
         if not rows and data.get("empty") is not True:
             raise invalid_resources()
@@ -64,6 +70,7 @@ class ForumService:
         if data.get("paged") or data.get("truncated"):
             warnings.append("FORUM_PAGINATION_PENDING: El foro tiene más discusiones sin leer.")
         discussions = parse_discussions(rows, url, ZoneInfo(self._settings.timezone))
+        # complete=false cuando hay paginación o recorte, para no presentar el foro como entero.
         return ForumDiscussions(
             course=course,
             forum_id=forum_id,
@@ -82,10 +89,12 @@ class ForumService:
         course = await self._resources.find_course(course_id)
         url = urljoin(CAMPUS_BASE_URL, f"mod/forum/discuss.php?d={discussion_id}")
         data = await self._read(url, DISCUSSION_SCRIPT)
+        # La discusión debe pertenecer a la materia indicada.
         if data.get("body") != "page-mod-forum-discuss" or str(data.get("course_id")) != str(
             course_id
         ):
             raise CourseError("FORUM_NOT_FOUND", "La discusión no es de la asignatura.")
+        # Mensajes a Markdown; warnings acumula recortes de texto y mensajes no leídos.
         posts, warnings = parse_posts(data.get("posts"), url)
         if data.get("truncated"):
             warnings.append("FORUM_PAGINATION_PENDING: La discusión tiene más mensajes sin leer.")

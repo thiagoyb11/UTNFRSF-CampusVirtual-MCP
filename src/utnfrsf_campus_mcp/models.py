@@ -5,6 +5,10 @@ from typing import Literal
 
 from pydantic import AwareDatetime, BaseModel
 
+# Cada clase de este módulo es el esquema JSON de una respuesta MCP (o de una parte de ella).
+# Pydantic valida los datos al construirlas y el SDK publica el esquema a los clientes.
+# AwareDatetime exige fechas con zona horaria, para no devolver instantes ambiguos.
+
 # Nivel de evidencia de una herramienta. Se ordena de menor a mayor:
 # - local_tests: solo pruebas locales con fixtures o dobles del adaptador.
 # - campus_partial: verificada en el campus real para una parte de su alcance.

@@ -10,6 +10,7 @@ from utnfrsf_campus_mcp.services.courses import CourseService
 
 
 def register_courses(server: MCPServer, service: CourseService) -> None:
+    # Solo lee el campus; repetirla no tiene efectos, por eso es idempotente.
     @server.tool(
         annotations=ToolAnnotations(
             read_only_hint=True,
@@ -29,6 +30,7 @@ def register_courses(server: MCPServer, service: CourseService) -> None:
         nunca una lista vacía exitosa. No abre cada materia ni modifica datos académicos.
         Los nombres parecidos se devuelven como materias distintas con sus respectivos IDs.
         """
+        # Errores conocidos se reenvían con su código; cualquier otro se oculta tras uno genérico.
         try:
             return await service.list_courses()
         except (CourseError, LoginError) as exc:

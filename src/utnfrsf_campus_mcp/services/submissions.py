@@ -42,9 +42,13 @@ from utnfrsf_campus_mcp.parsers.submissions import (
 )
 from utnfrsf_campus_mcp.services.authentication import AuthenticationService
 
+# Vida de un recibo de carga: 30 minutos para guardar la entrega con upload_id.
 RECEIPT_TTL_SECONDS = 1800
 
 
+# Lo que recuerda un recibo entre upload_files y submit_assignment: archivos preparados,
+# cuenta, estado previo de la tarea, formulario de entrega y área temporal usada.
+# phase avanza de "temporary" a "saved" (borrador), "submitted" o "uncertain".
 @dataclass(repr=False)
 class _UploadContext:
     plan: PreparedSubmission
@@ -57,6 +61,8 @@ class _UploadContext:
     result: SubmissionResult | None = None
 
 
+# Huella del estado de la tarea (estado, archivos y fila de evidencia) para detectar si
+# cambió entre dos lecturas.
 def _fingerprint(status: SubmissionStatus) -> str:
     return json.dumps(
         [
@@ -73,6 +79,7 @@ class SubmissionService:
         self, settings: Settings, session: CampusSession, authentication: AuthenticationService
     ):
         self._settings, self._session, self._authentication = settings, session, authentication
+        # Recibos vigentes, solo en memoria del proceso MCP (upload_id → contexto).
         self._uploads: dict[str, _UploadContext] = {}
 
     @staticmethod
@@ -81,6 +88,8 @@ class SubmissionService:
     ) -> PreparedSubmission:
         return prepare_submission(course_id, activity_id, files)
 
+    # Lee la página de la tarea y devuelve (estado, acciones disponibles, id de cuenta).
+    # Es la base de todo el flujo: se usa antes y después de cada escritura.
     async def _read_status(self, page: AsyncSession, course_id: int, activity_id: int):
         if (
             type(course_id) is not int
@@ -91,6 +100,7 @@ class SubmissionService:
             raise fail(
                 "SUBMISSION_INVALID_ACTIVITY", "Indicá IDs enteros positivos de curso y actividad."
             )
+        # Abre la tarea y confirma sesión activa dentro del campus.
         url = urljoin(CAMPUS_BASE_URL, f"mod/assign/view.php?id={activity_id}")
         result = await page.goto(
             url=url, timeout=self._settings.navigation_timeout_ms, wait_until="domcontentloaded"
@@ -105,6 +115,7 @@ class SubmissionService:
         await page.wait_for_selector(
             selector="#region-main", timeout=self._settings.navigation_timeout_ms
         )
+        # La página debe ser esta tarea (mismo id) de esta materia y sin errores.
         raw = await page.evaluate(script=SUBMISSION_STATE_SCRIPT)
         if (
             not isinstance(raw, dict)
@@ -124,6 +135,7 @@ class SubmissionService:
                 "SUBMISSION_FORMAT_UNSUPPORTED",
                 "No se pudo verificar la tabla de estado de la cuenta.",
             )
+        # Estado a partir de las clases CSS de la tabla; acciones solo sobre esta misma tarea.
         classes = " ".join(r.get("classes", "") for r in rows)
         state = parse_submission_state(classes, bool(raw.get("files")))
         actions = {}
@@ -134,6 +146,7 @@ class SubmissionService:
             if action["action"] in actions and actions[action["action"]] != target:
                 raise fail("SUBMISSION_FORMAT_UNSUPPORTED", "Hay acciones ambiguas en la tarea.")
             actions[action["action"]] = target
+        # Archivos ya entregados: deben ser enlaces limpios del campus.
         files = []
         for row in raw.get("files", []):
             if (
@@ -152,6 +165,7 @@ class SubmissionService:
             files=files,
             evidence=[row.get("text", "") for row in rows],
         )
+        # El id de cuenta permite detectar si la sesión cambió de usuario entre pasos.
         account_id = int(raw.get("account_id", 0))
         if account_id <= 0:
             raise fail(
@@ -173,6 +187,8 @@ class SubmissionService:
         async with self._session.acquire() as page:
             return (await self._read_status(page, course_id, activity_id))[0]
 
+    # Cliente HTTP con las cookies y el User-Agent del navegador, para que el campus vea la
+    # misma sesión al enviar formularios sin JavaScript.
     async def _http(self, page, referer: str | None = None):
         user_agent = await page.evaluate(script="navigator.userAgent")
         return CampusHTTP(
@@ -184,6 +200,7 @@ class SubmissionService:
     async def upload_files(
         self, course_id: int, activity_id: int, files: list[str]
     ) -> UploadedFiles:
+        # Valida archivos localmente y descarta recibos vencidos (máximo 32 en memoria).
         plan = prepare_submission(course_id, activity_id, files)
         self._uploads = {
             k: v
@@ -194,6 +211,7 @@ class SubmissionService:
             raise fail("UPLOAD_TOO_MANY_RECEIPTS", "Hay demasiadas cargas recientes en memoria.")
         await self._authentication.login()
         async with self._session.acquire() as page:
+            # Solo se carga sobre una tarea sin entrega y editable: nunca se reemplaza nada.
             before, actions, account = await self._read_status(page, course_id, activity_id)
             if before.files or before.state in ("draft", "submitted", "reopened"):
                 raise fail(
@@ -204,6 +222,8 @@ class SubmissionService:
                 raise fail(
                     "SUBMISSION_NOT_EDITABLE", "El campus no ofrece edición para esta tarea."
                 )
+            # Abre "Editar entrega" y exige un único formulario de entrega de Moodle, dirigido a
+            # esta tarea y esta cuenta, con sesskey y botón de guardado.
             http = await self._http(page, actions["editsubmission"])
             document = await to_thread.run_sync(http.document, actions["editsubmission"])
             forms = [
@@ -227,6 +247,7 @@ class SubmissionService:
                 raise fail(
                     "SUBMISSION_CONTEXT_CHANGED", "El formulario cambió de destino o de cuenta."
                 )
+            # Si la tarea ya tiene texto en línea escrito, se considera una entrega existente.
             if any(
                 value.strip()
                 for name, value in form.fields.items()
@@ -235,6 +256,8 @@ class SubmissionService:
                 raise fail(
                     "SUBMISSION_ALREADY_EXISTS", "La tarea ya contiene texto; no se reemplazó."
                 )
+            # Área temporal (draft) del gestor de archivos: su id, sus límites y su gestor sin
+            # JavaScript, que debe ser único, de esta materia y estar vacío.
             draft_id = form.fields.get("files_filemanager", "")
             if not draft_id.isdigit() or int(draft_id) <= 0:
                 raise fail(
@@ -255,6 +278,9 @@ class SubmissionService:
                     "UPLOAD_MANAGER_UNSUPPORTED",
                     "El gestor no identifica una única área temporal vacía.",
                 )
+            # Transporte por navegador: si Lightpanda soporta File/FormData, la carga puede
+            # hacerse desde la página. Como el helper corre en otro hilo, la corrutina se
+            # agenda en el loop principal y se espera su resultado (hasta 240 s).
             upload_transport = None
             if await page.evaluate(script=UPLOAD_API_SUPPORTED_SCRIPT) is True:
                 loop = asyncio.get_running_loop()
@@ -279,6 +305,8 @@ class SubmissionService:
                             "Se debe verificar la carga realizada por el navegador.",
                         ) from None
 
+            # Si el filepicker AJAX de Moodle está disponible, se arma su formulario de carga
+            # con el contexto observado (repositorio "upload", área temporal, límites y tipos).
             ajax_form = None
             if await page.evaluate(script=DISCOVER_UPLOAD_API_SCRIPT) is True:
                 picker = config.get("filepicker", {})
@@ -324,6 +352,9 @@ class SubmissionService:
                 # El API AJAX usa HTTP con el contexto del formulario observado.
                 # El puente File/FileList se reserva para el formulario sin JavaScript.
                 upload_transport = None
+            # Sube y verifica (blindado contra cancelación: una carga a medias debe terminar de
+            # verificarse). Si la tarea no cambió durante la carga, emite el recibo y retiene la
+            # sesión del navegador hasta que se use o venza.
             helper = FileUploadHelper(http, objects[0], limits, upload_transport, ajax_form)
             with CancelScope(shield=True):
                 verified = await to_thread.run_sync(helper.upload_files, plan.files)
@@ -348,6 +379,9 @@ class SubmissionService:
 
     @staticmethod
     def _save_fields(form: CampusForm, accept_statement: bool) -> dict[str, str]:
+        # Campos a enviar al guardar: los valores actuales del formulario, la declaración de
+        # autoría solo con aceptación explícita y el botón de guardado. Cualquier otra casilla
+        # u obligatorio desconocido detiene el envío.
         fields = dict(form.fields)
         for name in form.checkboxes:
             if name != "submissionstatement":
@@ -379,6 +413,7 @@ class SubmissionService:
     async def _verify_files(
         self, http: CampusHTTP, status: SubmissionStatus, plan: PreparedSubmission
     ) -> bool:
+        # La entrega debe tener exactamente los archivos del plan, con el mismo tamaño y hash.
         links = {f.name: f.url for f in status.files}
         if set(links) != {f.name for f in plan.files}:
             return False
@@ -391,6 +426,8 @@ class SubmissionService:
     async def submit_assignment(
         self, upload_id: str, finalize: bool = False, accept_statement: bool = False
     ) -> SubmissionResult:
+        # El recibo debe existir y estar vigente. Si ya se procesó, se devuelve el resultado
+        # anterior en lugar de volver a escribir (idempotencia ante reintentos del cliente).
         context = self._uploads.get(upload_id)
         if context is None or time.monotonic() - context.created_at >= RECEIPT_TTL_SECONDS:
             raise fail(
@@ -400,6 +437,7 @@ class SubmissionService:
             if context.result is None:
                 raise fail("SUBMISSION_IN_PROGRESS", "El recibo ya está siendo procesado.")
             return context.result
+        # Los archivos locales no deben haber cambiado desde la carga.
         plan = context.plan
         fresh = prepare_submission(plan.course_id, plan.activity_id, [f.path for f in plan.files])
         if fresh.files != plan.files:
@@ -416,6 +454,8 @@ class SubmissionService:
                     "SUBMISSION_CONTEXT_CHANGED", "La cuenta cambió después de preparar la carga."
                 )
             http = await self._http(page, actions.get("editsubmission", status.source_url))
+            # Fase 1, guardado: se revalida que estado, formulario, límites y área temporal sean
+            # los mismos que al cargar; recién entonces se envía el formulario una sola vez.
             if context.phase == "temporary":
                 if _fingerprint(status) != _fingerprint(context.before) or not status.can_edit:
                     raise fail(
@@ -469,6 +509,7 @@ class SubmissionService:
                     )
                     if actual != (file.size_bytes, file.sha256):
                         raise fail("UPLOAD_DRAFT_CHANGED", "Los bytes del área temporal cambiaron.")
+                # Desde el POST el resultado es incierto hasta reconciliarlo leyendo la tarea.
                 with CancelScope(shield=True):
                     context.phase = "uncertain"
                     try:
@@ -481,6 +522,8 @@ class SubmissionService:
                 status, actions, account = await self._read_status(
                     page, plan.course_id, plan.activity_id
                 )
+            # Fase 2, envío definitivo (finalize): sobre un borrador verificado, abre la
+            # confirmación de Moodle, exige un único formulario compatible y lo envía una vez.
             if context.phase == "saved" and finalize:
                 if account != context.account_id or not await self._verify_files(
                     http, status, plan
@@ -518,6 +561,9 @@ class SubmissionService:
                     context.result = await self._reconcile(page, http, upload_id, context)
             return context.result
 
+    # Después de cada POST: vuelve a leer la tarea y verifica cuenta y bytes. Solo con esa
+    # evidencia la fase pasa a "saved" o "submitted"; si no, queda "uncertain". La retención
+    # de la sesión se libera salvo que todavía falte el envío definitivo.
     async def _reconcile(self, page, http, upload_id, context) -> SubmissionResult:
         status = None
         verified = False

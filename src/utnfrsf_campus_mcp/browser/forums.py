@@ -1,5 +1,8 @@
 """Snapshots acotados de foros; no pulsan controles ni leen formularios."""
 
+# Lista de discusiones de mod/forum/view.php. Por cada fila devuelve id, título, enlace,
+# autor, grupo, timestamps de inicio y último mensaje, y cantidad de respuestas.
+# Limita a 500 filas (truncated) e informa si hay paginación, para no dar el foro por completo.
 FORUM_LIST_SCRIPT = r"""(() => {
     const main = document.querySelector('#region-main');
     const text = el => el?.textContent?.trim() || null;
@@ -24,6 +27,8 @@ FORUM_LIST_SCRIPT = r"""(() => {
         access_denied: !!main?.querySelector('.alert-danger, .errorbox')};
 })()"""
 
+# Mensajes de mod/forum/discuss.php: id, padre (para reconstruir el hilo), asunto, autor,
+# fecha, HTML del cuerpo y adjuntos que no están dentro del cuerpo.
 # Cada post anida sus respuestas: se lee solo su primer contenedor propio.
 DISCUSSION_SCRIPT = r"""(() => {
     const main = document.querySelector('#region-main');

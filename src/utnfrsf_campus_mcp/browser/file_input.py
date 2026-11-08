@@ -17,6 +17,7 @@ from utnfrsf_campus_mcp.parsers.submissions import CampusForm, fail, require_url
 
 _logger = logging.getLogger(__name__)
 
+# Comprueba que el navegador tenga las APIs necesarias para armar un archivo en memoria.
 UPLOAD_API_SUPPORTED_SCRIPT = (
     "typeof File === 'function' && typeof FormData === 'function' && "
     "typeof Uint8Array === 'function'"
@@ -27,11 +28,14 @@ async def upload_browser_file(
     page: AsyncSession, form: CampusForm, file: LocalSubmissionFile
 ) -> None:
     """Una sola petición; una redirección se reconcilia leyendo el draft, sin seguirla."""
+    # Solo se sube a los dos endpoints de carga de Moodle.
     require_url(form.action, ("/repository/filepicker.php", "/repository/repository_ajax.php"))
+    # Variable global con nombre aleatorio donde el navegador acumula el archivo y el resultado.
     key = "__campus_upload_" + uuid.uuid4().hex
     slot = f"globalThis[{json.dumps(key)}]"
     await page.evaluate(script=f"{slot} = {{chunks: [], done: false}}; true")
     try:
+        # 1. Copia el archivo al navegador en bloques de 256 KiB codificados en base64.
         async with await open_file(file.path, "rb") as source:
             while block := await source.read(256 * 1024):
                 encoded = json.dumps(base64.b64encode(block).decode("ascii"))
@@ -42,6 +46,8 @@ async def upload_browser_file(
                     return true;
                 }})()"""
                 )
+        # 2. Arma el File y elige cómo enviarlo: un formulario nativo con <input type=file>
+        #    (filepicker.php, si DataTransfer funciona) o un POST con FormData y fetch.
         fields = json.dumps(form.fields)
         mime = mimetypes.guess_type(file.name)[0] or "application/octet-stream"
         script = f"""(() => {{
@@ -104,6 +110,7 @@ async def upload_browser_file(
             return true;
         }})()"""
         mode = await page.evaluate(script=script)
+        # 3a. Formulario nativo: se pulsa su botón y se valida la respuesta de la navegación.
         if isinstance(mode, dict) and mode.get("native") is True:
             result = await page.click(selector="#" + key + "_submit")
             if result.http_status == 429:
@@ -114,6 +121,7 @@ async def upload_browser_file(
             if result.url and not same_origin(result.url, CAMPUS_BASE_URL):
                 raise fail("SUBMISSION_ACCESS_DENIED", "El formulario redirigió fuera del campus.")
             return
+        # 3b. fetch: se consulta el estado hasta que termine, con un presupuesto de 180 s.
         started = time.monotonic()
         while time.monotonic() - started < 180:
             result = await page.evaluate(
@@ -125,6 +133,8 @@ async def upload_browser_file(
             )
             if isinstance(result, dict) and result.get("done"):
                 status = result.get("status")
+                # Ante un 429 se registran solo metadatos (cabeceras y banderas), nunca el
+                # cuerpo de la respuesta, y no se reintenta.
                 if status == 429:
                     metadata = result.get("metadata", {})
                     _logger.warning(
@@ -147,12 +157,14 @@ async def upload_browser_file(
                     )
                 if status in (401, 403):
                     raise fail("SUBMISSION_ACCESS_DENIED", "El campus denegó la carga de archivos.")
+                # Otro estado no prueba ni éxito ni fracaso: hay que revisar el área temporal.
                 if status != 200:
                     raise fail(
                         "SUBMISSION_WRITE_UNCERTAIN",
                         "La carga requiere verificar el área temporal.",
                     )
                 return
+            # Espera hasta 5 s a que termine; si vence, el bucle vuelve a consultar el estado.
             try:
                 await page.wait_for_script(script=f"{slot}?.done === true", timeout=5000)
             except Exception:
@@ -162,12 +174,15 @@ async def upload_browser_file(
             "La carga no terminó dentro del presupuesto; verificá el área temporal.",
         )
     finally:
+        # Libera los bytes que quedaron en memoria del navegador.
         try:
             await page.evaluate(script=f"delete globalThis[{json.dumps(key)}]; true")
         except Exception:
             pass  # Una navegación nativa destruye el contexto anterior y sus buffers.
 
 
+# Confirma que el filepicker de este Moodle usa el endpoint y el campo de carga esperados,
+# leyendo su JavaScript público, antes de intentar subir archivos.
 DISCOVER_UPLOAD_API_SCRIPT = r"""return await (async () => {
     try {
         const response = await fetch(new URL('/repository/filepicker.js', location.href), {

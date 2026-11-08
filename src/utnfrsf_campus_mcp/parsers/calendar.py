@@ -21,6 +21,8 @@ CALENDAR_CONTEXT_SCRIPT = r"""(() => {
 })()"""
 
 
+# Error genérico de formato: cualquier dato inesperado invalida el mes entero, para no
+# devolver un calendario incompleto como si estuviera completo.
 def invalid_calendar() -> CalendarError:
     return CalendarError(
         "CALENDAR_FORMAT_UNSUPPORTED",
@@ -29,6 +31,7 @@ def invalid_calendar() -> CalendarError:
 
 
 def resolve_timezone(value: Any, fallback: str) -> tuple[ZoneInfo, str]:
+    # Usa la zona del perfil del campus si es válida; si no, la configurada, e informa cuál.
     if isinstance(value, str):
         try:
             return ZoneInfo(value), "campus"
@@ -38,11 +41,13 @@ def resolve_timezone(value: Any, fallback: str) -> tuple[ZoneInfo, str]:
 
 
 def month_bounds(year: int, month: int, zone: ZoneInfo) -> tuple[datetime, datetime]:
+    # Intervalo [inicio del mes, inicio del mes siguiente); diciembre pasa a enero del año próximo.
     start = datetime(year, month, 1, tzinfo=zone)
     end = datetime(year + (month == 12), month % 12 + 1, 1, tzinfo=zone)
     return start, end
 
 
+# Validadores estrictos de los campos de Moodle: enteros reales (no bool ni str) y textos no vacíos.
 def _integer(value: Any, minimum: int = 0) -> int:
     if type(value) is not int or value < minimum:
         raise invalid_calendar()
@@ -60,6 +65,8 @@ def activity_link(raw: Any, module: str) -> tuple[str, int] | None:
     """Acepta enlaces reales del módulo; conserva solo su ID, sin acciones ni tokens."""
     if not isinstance(raw, str) or not raw:
         return None
+    # Debe ser mod/<módulo>/view.php del campus con un único id numérico; se reconstruye
+    # limpia para descartar parámetros extra.
     url = urljoin(CAMPUS_BASE_URL, unescape(raw))
     if not same_origin(url, CAMPUS_BASE_URL):
         return None
@@ -77,6 +84,7 @@ def parse_month(
     payload: Any, year: int, month: int, zone: ZoneInfo, *, deadlines_only: bool
 ) -> list[CalendarActivity]:
     """Exige todos los días del mes y eventos cargados; deduplica eventos de varios días."""
+    # 1. La respuesta debe ser del mes pedido y con los eventos ya cargados.
     if not isinstance(payload, dict) or payload.get("initialeventsloaded") is not True:
         raise invalid_calendar()
     date = payload.get("date")
@@ -88,6 +96,9 @@ def parse_month(
     weeks = payload.get("weeks")
     if not isinstance(weeks, list) or not 4 <= len(weeks) <= 6:
         raise invalid_calendar()
+    # 2. Recorre semanas y días: cada día del mes debe aparecer una sola vez y su timestamp
+    #    debe corresponder a esa fecha. Un evento de varios días aparece repetido; se guarda
+    #    una sola vez y se exige que sus datos esenciales coincidan en todas las copias.
     days: set[int] = set()
     events: dict[int, dict] = {}
     occurrences = 0
@@ -133,10 +144,12 @@ def parse_month(
                             raise invalid_calendar()
                 else:
                     events[event_id] = item
+    # 3. Tienen que haber llegado todos los días del mes, sin faltantes.
     if days != set(range(1, calendar.monthrange(year, month)[1] + 1)):
         raise invalid_calendar()
     if len(events) > 1000:
         raise CalendarError("CALENDAR_LIMIT_EXCEEDED", "El mes supera el límite de 1000 eventos.")
+    # 4. Convierte cada evento vinculado a una actividad en un CalendarActivity.
     start, end = month_bounds(year, month, zone)
     result = []
     for event in events.values():
@@ -146,6 +159,7 @@ def parse_month(
             continue
         if not isinstance(module, str) or not re.fullmatch(r"[a-z][a-z0-9_]*", module):
             raise invalid_calendar()
+        # Inicio y fin en la zona del campus.
         timestamp = _integer(event.get("timestart"), 1)
         duration = _integer(event.get("timeduration"))
         try:
@@ -153,6 +167,7 @@ def parse_month(
             ends_at = datetime.fromtimestamp(timestamp + duration, zone)
         except (ValueError, OverflowError, OSError):
             raise invalid_calendar() from None
+        # Solo los eventos "due" (vencimiento) y "close" (cierre) son fechas límite.
         event_type = _text(event.get("eventtype"))
         deadline_kind = event_type if event_type in ("due", "close") else None
         if deadline_kind and duration:
@@ -166,6 +181,8 @@ def parse_month(
             belongs = start <= starts_at < end
         if not belongs or (deadlines_only and deadline_at is None):
             continue
+        # Enlace a la actividad: primero el del evento, si no, el de su acción. Sin ninguno,
+        # se falla en lugar de omitir el evento en silencio.
         resolved = activity_link(event.get("url"), module)
         if resolved is None:
             action = event.get("action")
@@ -183,6 +200,7 @@ def parse_month(
         if not isinstance(course, dict):
             raise invalid_calendar()
         course_id = _integer(course.get("id"), 1)
+        # Enlace a la vista diaria del calendario, anclado al evento.
         calendar_url = (
             urljoin(
                 CAMPUS_BASE_URL,
@@ -212,4 +230,5 @@ def parse_month(
                 calendar_url=calendar_url,
             )
         )
+    # Orden cronológico estable: por inicio y, ante empate, por id de evento.
     return sorted(result, key=lambda event: (event.starts_at.timestamp(), event.event_id))

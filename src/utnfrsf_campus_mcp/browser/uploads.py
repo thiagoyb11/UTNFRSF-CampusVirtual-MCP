@@ -26,6 +26,7 @@ from utnfrsf_campus_mcp.parsers.submissions import (
     validate_files,
 )
 
+# Únicas rutas del campus que este transporte puede leer o a las que puede enviar formularios.
 _FORM_PATHS = (
     "/repository/filepicker.php",
     "/repository/repository_ajax.php",
@@ -49,10 +50,13 @@ class CampusHTTP:
 
     def document(self, url: str, data=None, headers=None, _read_attempt: int = 0) -> CampusHTML:
         require_url(url, _FORM_PATHS)
+        # Con datos es un POST (escritura); sin datos, un GET (lectura).
         writing = data is not None
         method = "POST" if writing else "GET"
         try:
             request_headers = {"User-Agent": self._user_agent, **(headers or {})}
+            # Los POST llevan Origin y Referer del campus, como haría el navegador, y los de
+            # repository_ajax.php además la cabecera AJAX que Moodle espera.
             if writing:
                 origin = urlsplit(CAMPUS_BASE_URL)
                 request_headers.update(
@@ -64,6 +68,7 @@ class CampusHTTP:
                 if urlsplit(url).path == "/repository/repository_ajax.php":
                     request_headers["X-Requested-With"] = "XMLHttpRequest"
             request = Request(url, data=data, headers=request_headers, method=method)
+            # Lee como máximo 4 MiB de HTML y verifica que no sea una página de login o error.
             with self._opener.open(request, timeout=60) as response:
                 require_url(response.url, _FORM_PATHS)
                 raw = response.read(4 * 1024 * 1024 + 1)
@@ -79,6 +84,8 @@ class CampusHTTP:
             status, location = exc.code, exc.headers.get("Location")
             retry_after = exc.headers.get("Retry-After", "2")
             exc.close()
+            # Un 429 en una lectura se reintenta hasta 2 veces si Retry-After es razonable.
+            # Las escrituras nunca se reintentan.
             if status == 429 and not writing and _read_attempt < 2:
                 if not retry_after.isdigit() or int(retry_after) > 15:
                     raise fail(
@@ -87,6 +94,8 @@ class CampusHTTP:
                     ) from None
                 time.sleep(max(1, int(retry_after)))
                 return self.document(url, _read_attempt=_read_attempt + 1)
+            # Redirecciones: al login significa sesión vencida; tras un POST, Moodle redirige
+            # al resultado y se lee con un GET; en una lectura no se aceptan.
             if status in (301, 302, 303) and location:
                 target = urljoin(url, location)
                 if urlsplit(target).path == "/login/index.php":
@@ -105,12 +114,14 @@ class CampusHTTP:
             raise fail(
                 code, f"HTTP {status} en {method} {urlsplit(url).path}; no se reenvió el POST."
             ) from None
+        # Un corte de red durante un POST deja el resultado incierto: pudo haberse guardado.
         except (OSError, URLError, HTTPException, TimeoutError):
             code = "SUBMISSION_WRITE_UNCERTAIN" if writing else "SUBMISSION_NETWORK_ERROR"
             raise fail(
                 code, "No se pudo confirmar la respuesta del campus; no se reintentó."
             ) from None
 
+    # Envía un formulario HTML común (application/x-www-form-urlencoded).
     def post_form(self, form: CampusForm, fields: dict[str, str]) -> CampusHTML:
         return self.document(
             form.action,
@@ -118,6 +129,8 @@ class CampusHTTP:
             {"Content-Type": "application/x-www-form-urlencoded"},
         )
 
+    # Descarga un archivo ya subido (borrador o entrega) y devuelve tamaño y SHA-256, para
+    # comprobar que el campus guardó exactamente los bytes enviados.
     def hash_file(self, url: str, maximum: int) -> tuple[int, str]:
         if not urlsplit(url).path.startswith(("/draftfile.php/", "/pluginfile.php/")):
             raise fail(
@@ -152,6 +165,8 @@ class MultipartFile:
     """Iterable con Content-Length conocido: no carga el archivo entero en memoria."""
 
     def __init__(self, fields: dict[str, str], field_name: str, file: LocalSubmissionFile):
+        # Arma por adelantado la cabecera multipart (campos del formulario y encabezado del
+        # archivo) y el cierre; el contenido del archivo se lee recién al enviar.
         self.boundary = "CampusMCP" + uuid.uuid4().hex
         self.file = file
         self.prefix = b""
@@ -173,6 +188,8 @@ class MultipartFile:
         self.length = len(self.prefix) + file.size_bytes + len(self.suffix)
 
     def __iter__(self) -> Iterator[bytes]:
+        # Emite cabecera, archivo en bloques de 64 KiB y cierre. Si el archivo cambió desde
+        # que se preparó (tamaño o hash), lo informa como escritura incierta.
         yield self.prefix
         digest = hashlib.sha256()
         size = 0
@@ -203,6 +220,8 @@ class FileUploadHelper:
         self.http, self.manager_url, self.limits = http, manager_url, limits
         self._upload_transport = upload_transport
         self._ajax_form = ajax_form
+        # El gestor de archivos fija el contexto (área temporal, curso, contexto y sesskey);
+        # todo formulario posterior debe conservar exactamente esos valores.
         require_url(manager_url, ("/repository/draftfiles_manager.php",))
         self._binding = parse_qs(urlsplit(manager_url).query)
         for name in ("itemid", "course", "ctx_id", "sesskey"):
@@ -212,6 +231,7 @@ class FileUploadHelper:
                 )
         self.itemid = self._binding["itemid"][0]
 
+    # Verifica que una URL del selector siga apuntando al mismo contexto del gestor.
     def _bind(self, url: str):
         require_url(url, ("/repository/filepicker.php", "/repository/draftfiles_manager.php"))
         query = parse_qs(urlsplit(url).query)
@@ -223,9 +243,12 @@ class FileUploadHelper:
                 "UPLOAD_CONTEXT_CHANGED", "El selector cambió de cuenta, curso o área temporal."
             )
 
+    # Archivos que hay ahora en el área temporal: nombre → enlace de descarga.
     def listing(self) -> dict[str, str]:
         return draft_links(self.http.document(self.manager_url), self.itemid)
 
+    # Obtiene el formulario de carga: el AJAX ya descubierto (validando su contexto) o, sin
+    # él, recorre el selector de repositorios hasta el formulario de "subir un archivo".
     def _upload_form(self) -> CampusForm:
         if self._ajax_form is not None:
             require_url(self._ajax_form.action, ("/repository/repository_ajax.php",))
@@ -266,6 +289,8 @@ class FileUploadHelper:
         )
 
     def upload_files(self, files: list[LocalSubmissionFile]) -> list[LocalSubmissionFile]:
+        # Antes de subir: valida límites contando lo que ya hay en el área temporal y
+        # comprueba que los archivos locales no cambiaron desde que se prepararon.
         existing = self.listing()
         existing_bytes = sum(
             self.http.hash_file(url, 200 * 1024 * 1024)[0] for url in existing.values()
@@ -274,6 +299,7 @@ class FileUploadHelper:
         fresh = prepare_submission(1, 1, [file.path for file in files]).files
         if fresh != files:
             raise fail("UPLOAD_FILE_CHANGED", "Los archivos cambiaron después de prepararlos.")
+        # Sube los archivos de a uno; un resultado incierto no corta acá, se reconcilia abajo.
         uploaded = []
         for file in files:
             form = self._upload_form()

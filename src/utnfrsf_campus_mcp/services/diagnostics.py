@@ -16,6 +16,7 @@ def get_server_info(settings: Settings, registered_tools: Iterable[str]) -> Serv
     nunca anuncia una herramienta ausente. Si una herramienta registrada no tiene
     entrada en el catálogo, se informa en `undocumented_tools` en lugar de ocultarla.
     """
+    # Orden alfabético y sin duplicados, para una respuesta estable entre llamadas.
     registered = sorted(set(registered_tools))
 
     # Filtra el catálogo conservando su orden, que agrupa las herramientas por área.
@@ -38,6 +39,7 @@ def get_server_info(settings: Settings, registered_tools: Iterable[str]) -> Serv
 
 def _summary(capabilities: list[Capability], undocumented: list[str]) -> str:
     """Resume cuántas herramientas hay en cada nivel de validación."""
+    # Cuenta las herramientas por nivel de evidencia declarado en el catálogo.
     counts = {"campus_verified": 0, "campus_partial": 0, "local_tests": 0}
     for item in capabilities:
         counts[item.status] += 1
@@ -51,6 +53,7 @@ def _summary(capabilities: list[Capability], undocumented: list[str]) -> str:
         "esta respuesta no comprueba la sesión del campus."
     )
 
+    # Una herramienta sin estado declarado se nombra explícitamente en vez de ocultarse.
     if undocumented:
         text += f" Herramientas sin estado declarado: {', '.join(undocumented)}."
 

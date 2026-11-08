@@ -13,6 +13,7 @@ from utnfrsf_campus_mcp.services.calendar import CalendarService
 
 
 def register_calendar(server: MCPServer, service: CalendarService) -> None:
+    # Solo lectura del calendario: repetir la consulta no cambia nada en el campus.
     @server.tool(
         annotations=ToolAnnotations(
             read_only_hint=True,
@@ -38,6 +39,8 @@ def register_calendar(server: MCPServer, service: CalendarService) -> None:
         No confirma entregas pendientes. Autentica con .env y consulta solo eventos visibles
         para la cuenta y sus filtros de calendario. No depende del idioma de la interfaz.
         """
+        # La validación de rangos ya la hizo pydantic; el servicio exige year y month juntos.
+        # Los errores conocidos se reenvían con su código; el resto se oculta tras uno genérico.
         try:
             return await service.list_monthly_activities(year, month, deadlines_only)
         except (CalendarError, LoginError) as exc:

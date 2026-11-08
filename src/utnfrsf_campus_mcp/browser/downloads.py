@@ -23,10 +23,13 @@ from utnfrsf_campus_mcp.errors import DownloadError
 from utnfrsf_campus_mcp.models import DownloadedFile
 from utnfrsf_campus_mcp.parsers.login import same_origin
 
+# Límites por archivo: 200 MiB y 180 s de lectura total.
 MAX_DOWNLOAD_BYTES = 200 * 1024 * 1024
 DOWNLOAD_TIMEOUT_SECONDS = 180
 
 
+# Desactiva las redirecciones: una 30x se convierte en HTTPError y se reporta, para no
+# enviar cookies a otro destino ni descargar algo distinto de lo verificado.
 class _NoRedirect(HTTPRedirectHandler):
     def redirect_request(self, req, fp, code, msg, headers, newurl):
         return None
@@ -57,6 +60,7 @@ def session_cookie_jar(payload: Any) -> CookieJar:
                 }
                 for name, morsel in parsed.items()
             ]
+    # Acepta la lista directa o {"cookies": [...]}, según la versión del SDK.
     entries = payload.get("cookies") if isinstance(payload, dict) else payload
     if not isinstance(entries, list):
         raise DownloadError(
@@ -69,10 +73,12 @@ def session_cookie_jar(payload: Any) -> CookieJar:
             raise DownloadError(
                 "DOWNLOAD_COOKIES_UNSUPPORTED", "La sesión tiene un formato inesperado."
             )
+        # Solo cookies del dominio del campus; el resto se ignora.
         domain = str(row.get("domain", "")).lower()
         cookie_host = domain.lstrip(".")
         if not cookie_host or not (host == cookie_host or host.endswith("." + cookie_host)):
             continue
+        # Nombre y valor válidos para una cabecera Cookie (sin saltos de línea ni ";").
         name, value = row.get("name"), row.get("value")
         if (
             not isinstance(name, str)
@@ -83,6 +89,7 @@ def session_cookie_jar(payload: Any) -> CookieJar:
             raise DownloadError(
                 "DOWNLOAD_COOKIES_UNSUPPORTED", "No se pudo usar la sesión del navegador."
             )
+        # La cookie conserva expiración, path y secure, para que CookieJar decida cuándo enviarla.
         expires = row.get("expires")
         expires = int(expires) if isinstance(expires, (float, int)) and expires > 0 else None
         jar.set_cookie(
@@ -125,6 +132,8 @@ class _CampusPageDetector(HTMLParser):
         self.login_fields: set[str] = set()
 
     def handle_starttag(self, tag, attrs):
+        # Señales de Moodle: <body id="page-..."> (página del campus), id de login o clase
+        # notloggedin, un formulario de login con usuario y contraseña, o un aviso de error.
         attributes = dict(attrs)
         classes = (attributes.get("class") or "").split()
         if tag == "body":
@@ -150,6 +159,8 @@ class _CampusPageDetector(HTMLParser):
             self.login_fields.clear()
 
 
+# Nombre de archivo seguro a partir de la URL: sin barras ni caracteres de control, sin
+# puntos al inicio y con un máximo de 200 bytes conservando la extensión.
 def safe_file_name(url: str) -> str:
     name = unicodedata.normalize("NFKC", unquote(urlsplit(url).path).split("/")[-1])
     name = re.sub(r"[\\/:\x00-\x1f\x7f]", "_", name).strip(" .")
@@ -170,6 +181,7 @@ def download_file(url: str, jar: CookieJar, destination: Path) -> DownloadedFile
         raise DownloadError(
             "DOWNLOAD_INVALID_URL", "Solo se descargan archivos observados del campus."
         )
+    # El temporal se crea en la misma carpeta de destino, para poder publicarlo con un link.
     name = safe_file_name(url)
     destination.mkdir(parents=True, exist_ok=True)
     destination = destination.resolve()
@@ -183,6 +195,7 @@ def download_file(url: str, jar: CookieJar, destination: Path) -> DownloadedFile
         size = 0
         html_detector = None
         with os.fdopen(descriptor, "wb") as output, opener.open(request, timeout=30) as response:
+            # La respuesta debe ser 200 del propio campus, con un tamaño dentro del límite.
             if response.status != 200 or not same_origin(response.url, CAMPUS_BASE_URL):
                 raise DownloadError(
                     "DOWNLOAD_HTTP_ERROR", "El campus no devolvió el archivo solicitado."
@@ -199,11 +212,14 @@ def download_file(url: str, jar: CookieJar, destination: Path) -> DownloadedFile
                 raise DownloadError(
                     "DOWNLOAD_TOO_LARGE", "El tamaño del archivo está fuera del límite permitido."
                 )
+            # Lee en bloques de 64 KiB: controla tiempo y tamaño, calcula el SHA-256 y escribe.
             while block := response.read(64 * 1024):
                 if time.monotonic() - started > DOWNLOAD_TIMEOUT_SECONDS:
                     raise DownloadError(
                         "DOWNLOAD_TIMEOUT", "Se agotó el tiempo de descarga del archivo."
                     )
+                # Si la respuesta parece HTML, se analiza para detectar que en lugar del archivo
+                # llegó la página de login o de error del campus.
                 if size == 0 and (
                     content_type in ("text/html", "application/xhtml+xml")
                     or block.lstrip().lower().startswith((b"<!doctype html", b"<html", b"<body"))
@@ -226,6 +242,8 @@ def download_file(url: str, jar: CookieJar, destination: Path) -> DownloadedFile
                     )
                 digest.update(block)
                 output.write(block)
+            # Los bytes recibidos deben coincidir con el Content-Length informado; luego se
+            # fuerza la escritura a disco.
             if expected is not None and size != expected:
                 raise DownloadError(
                     "DOWNLOAD_INCOMPLETE",
@@ -256,6 +274,7 @@ def download_file(url: str, jar: CookieJar, destination: Path) -> DownloadedFile
         raise DownloadError(
             "DOWNLOAD_DESTINATION_FULL", "No se encontró un nombre de archivo libre."
         )
+    # Traduce cada fallo de red, HTTP o disco a un código de descarga propio.
     except HTTPError as exc:
         if 300 <= exc.code < 400:
             code, message = (
@@ -283,4 +302,6 @@ def download_file(url: str, jar: CookieJar, destination: Path) -> DownloadedFile
             "DOWNLOAD_IO_ERROR", "No se pudo guardar el archivo en el destino local."
         ) from None
     finally:
+        # El temporal se borra siempre: tras el link exitoso el archivo publicado sigue
+        # existiendo, y ante un fallo no queda una descarga parcial.
         temporary.unlink(missing_ok=True)

@@ -56,6 +56,8 @@ class CalendarService:
         try:
             with fail_after(60):
                 async with self._session.acquire() as page:
+                    # El Dashboard (/my/) incluye el bloque de calendario y carga el módulo
+                    # JavaScript de Moodle que se usa para pedir el mes.
                     result = await page.goto(
                         url=urljoin(CAMPUS_BASE_URL, "my/"),
                         timeout=self._settings.navigation_timeout_ms,
@@ -67,6 +69,7 @@ class CalendarService:
                         selector='[data-block="calendar_month"] .calendarwrapper',
                         timeout=self._settings.navigation_timeout_ms,
                     )
+                    # course_id 1 es el sitio entero: así el calendario abarca todas las materias.
                     context = await page.evaluate(script=CALENDAR_CONTEXT_SCRIPT)
                     if not isinstance(context, dict) or context.get("course_id") != "1":
                         raise invalid_calendar()
@@ -74,12 +77,16 @@ class CalendarService:
                         raise CalendarError(
                             "CALENDAR_ACCESS_DENIED", "El navegador salió del campus."
                         )
+                    # Zona del campus (o la configurada como fallback); sin year/month se usa el
+                    # mes actual en esa zona.
                     zone, zone_source = resolve_timezone(
                         context.get("timezone"), self._settings.timezone
                     )
                     now = datetime.now(zone)
                     year = now.year if year is None else year
                     month = now.month if month is None else month
+                    # Pide el mes completo y vuelve a confirmar la sesión: si venció durante la
+                    # consulta, el resultado podría estar vacío sin ser real.
                     payload = await read_calendar_month(
                         page, year, month, self._settings.navigation_timeout_ms
                     )
@@ -87,6 +94,8 @@ class CalendarService:
                     activities = parse_month(
                         payload, year, month, zone, deadlines_only=deadlines_only
                     )
+                    # El inicio del mes sirve para construir el enlace de origen; los warnings
+                    # explican los límites de lo que el calendario puede afirmar.
                     start, _ = month_bounds(year, month, zone)
                     warnings = [
                         "El calendario no confirma si una actividad está entregada o pendiente. "
@@ -111,6 +120,7 @@ class CalendarService:
                         activities=activities,
                         warnings=warnings,
                     )
+        # Timeouts y fallos del navegador se traducen a códigos propios, sin texto remoto.
         except TimeoutError:
             raise CalendarError(
                 "CALENDAR_TIMEOUT", "Se agotó el tiempo de consulta del mes."
@@ -126,6 +136,7 @@ class CalendarService:
 
     @staticmethod
     def _check_http(status: int | None) -> None:
+        # Traduce el estado HTTP de la navegación a un error específico.
         if status == 429:
             raise CalendarError("CALENDAR_RATE_LIMITED", "El campus limitó las solicitudes.")
         if status in (401, 403):
@@ -139,6 +150,7 @@ class CalendarService:
 
     @staticmethod
     async def _require_session(page: AsyncSession) -> None:
+        # Mismo control que en los demás servicios: origen del campus, sin 429 y con sesión.
         state = await page.evaluate(script=LOGIN_PAGE_STATE_SCRIPT)
         if not isinstance(state, dict):
             raise invalid_calendar()

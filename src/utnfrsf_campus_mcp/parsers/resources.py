@@ -43,12 +43,14 @@ _MODULE_PATH = re.compile(r"/mod/([a-z][a-z0-9_]*)/view\.php\Z")
 _MODULE_FILE_PATH = re.compile(r"/pluginfile\.php/[0-9]+/mod_(resource|folder|assign|page)/")
 
 
+# Error genérico cuando la página no tiene la estructura esperada de Moodle.
 def invalid_resources() -> CourseError:
     return CourseError(
         "RESOURCES_FORMAT_UNSUPPORTED", "No se pudo verificar la estructura del curso."
     )
 
 
+# Convierte a entero solo dígitos ASCII (acepta "12" o 12, rechaza True, "-1" o "1e3").
 def integer(value: Any, minimum: int = 0) -> int:
     if isinstance(value, bool) or not re.fullmatch(r"[0-9]+", str(value)):
         raise invalid_resources()
@@ -63,6 +65,8 @@ def clean_link(raw: Any, source_url: str) -> str | None:
     if not isinstance(raw, str) or not raw.strip() or raw.strip().startswith("#"):
         return None
     try:
+        # Resuelve enlaces relativos y descarta esquemas no web, usuario/contraseña en la URL
+        # y parámetros con apariencia de secreto (sesskey, token, ...).
         url = urljoin(source_url, raw.strip())
         parts = urlsplit(url)
         if (
@@ -81,6 +85,7 @@ def clean_link(raw: Any, source_url: str) -> str | None:
         return None
 
 
+# Si la URL es mod/<tipo>/view.php?id=<n> del campus, devuelve (tipo, n); si no, None.
 def module_target(url: str) -> tuple[str, int] | None:
     if not same_origin(url, CAMPUS_BASE_URL):
         return None
@@ -106,6 +111,7 @@ def file_module_type(url: str) -> str | None:
     return match[1] if match else None
 
 
+# Si el enlace lleva a una sección de esta misma materia, devuelve (índice, URL canónica).
 def section_target(raw: Any, course_id: int, source_url: str) -> tuple[int, str] | None:
     url = clean_link(raw, source_url)
     if not url or not same_origin(url, CAMPUS_BASE_URL):
@@ -142,6 +148,8 @@ def make_link(
     url = clean_link(row.get("url"), source_url)
     if not url:
         return None
+    # Clasifica el enlace: externo, archivo (pluginfile o extensión conocida), actividad de
+    # Moodle según su tipo, o enlace interno genérico.
     parts = urlsplit(url)
     target = module_target(url)
     if not same_origin(url, CAMPUS_BASE_URL):
@@ -157,6 +165,7 @@ def make_link(
         )
     else:
         kind = "link"
+    # Nombre visible normalizado; si no hay, el nombre del archivo de la URL.
     name = row.get("name")
     return CourseLink(
         name=" ".join(name.split())
@@ -174,6 +183,8 @@ def make_link(
 def parse_course_page(
     payload: Any, course_id: int
 ) -> tuple[str, list[CourseSection], list[CourseLink], list[UnlinkedActivity], list[CourseSection]]:
+    # Devuelve (formato, secciones leídas, enlaces, actividades sin enlace, navegación).
+    # 1. La página debe ser la de este curso, completa, sin error y en un formato conocido.
     if not isinstance(payload, dict) or not payload.get("present"):
         raise invalid_resources()
     if payload.get("access_denied"):
@@ -199,6 +210,7 @@ def parse_course_page(
     rows = payload.get("sections")
     if not isinstance(rows, list) or not rows:
         raise invalid_resources()
+    # 2. Cada sección presente en la página queda marcada como visitada.
     for row in rows:
         index = integer(row["index"])
         sections.append(
@@ -213,6 +225,8 @@ def parse_course_page(
         activities, section_links = row.get("activities"), row.get("links")
         if not isinstance(activities, list) or not isinstance(section_links, list):
             raise invalid_resources()
+        # 3. Actividades: el tipo sale de la clase CSS modtype_<tipo>. Su enlace principal debe
+        #    apuntar al mismo módulo; sin enlace (restringida u oculta) se lista aparte.
         activity_urls = set()
         for activity in activities:
             module_id = integer(activity.get("id"), 1)
@@ -240,6 +254,7 @@ def parse_course_page(
                         availability=activity.get("availability"),
                     )
                 )
+            # Enlaces dentro de la descripción de la actividad, asociados a ese módulo.
             if not isinstance(activity.get("links"), list):
                 raise invalid_resources()
             for embedded in activity["links"]:
@@ -247,10 +262,13 @@ def parse_course_page(
                 if link:
                     activity_urls.add(link.url)
                     links.append(link)
+        # Resto de enlaces de la sección (resumen, etiquetas), sin repetir los de actividades.
         for embedded in section_links:
             link = make_link(embedded, source, index)
             if link and link.url not in activity_urls:
                 links.append(link)
+    # 4. Navegación: enlaces a otras secciones del curso, para recorrer las que no vinieron
+    #    en esta página. Las marcadas como deshabilitadas no se visitan.
     nav = payload.get("navigation")
     if not isinstance(nav, list):
         raise invalid_resources()

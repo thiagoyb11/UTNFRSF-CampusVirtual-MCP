@@ -16,15 +16,19 @@ from utnfrsf_campus_mcp.errors import SubmissionError
 from utnfrsf_campus_mcp.models import LocalSubmissionFile, PreparedSubmission, UploadLimits
 from utnfrsf_campus_mcp.parsers.login import same_origin
 
+# Límite local por archivo y clases CSS con las que Moodle marca el estado de la entrega
+# y de la calificación (independientes del idioma de la interfaz).
 MAX_LOCAL_FILE_BYTES = 200 * 1024 * 1024
 SUBMISSION_STATE_CLASS = re.compile(r"\bsubmissionstatus(new|draft|submitted|reopened)\b")
 GRADING_STATE_CLASS = re.compile(r"\bsubmission(?:not)?graded\b")
 
 
+# Atajo para construir errores de entrega.
 def fail(code: str, message: str) -> SubmissionError:
     return SubmissionError(code, message)
 
 
+# Lista blanca de destinos: la URL debe ser del campus y tener una de las rutas permitidas.
 def require_url(url: str, paths: tuple[str, ...]) -> str:
     if not same_origin(url, CAMPUS_BASE_URL) or urlsplit(url).path not in paths:
         raise fail(
@@ -47,6 +51,9 @@ def parse_submission_state(classes: str, has_files: bool) -> str:
     return "unknown"
 
 
+# Formulario HTML leído de una página: destino, método, campos con sus valores actuales,
+# campos de archivo, obligatorios, casillas y botones de envío.
+# repr=False evita que tokens como sesskey terminen impresos en logs o errores.
 @dataclass(repr=False)
 class CampusForm:
     action: str
@@ -63,6 +70,8 @@ class CampusHTML(HTMLParser):
     """Datos privados de formulario; nunca serializar esta instancia en respuestas MCP."""
 
     def __init__(self, html: str, url: str):
+        # Analiza la página completa al construirse: formularios, enlaces, objetos embebidos,
+        # scripts y señales de login o error.
         super().__init__(convert_charrefs=True)
         self.url = url
         self.forms: list[CampusForm] = []
@@ -102,6 +111,8 @@ class CampusHTML(HTMLParser):
                 (attrs.get("enctype") or "").lower(),
             )
             self.forms.append(self._form)
+        # Controles dentro de un formulario: se clasifican por tipo. Los deshabilitados no se
+        # envían, igual que en un navegador; las casillas solo aportan valor si están marcadas.
         if tag not in ("input", "button", "textarea", "select") or self._form is None:
             return
         name = attrs.get("name")
@@ -123,6 +134,8 @@ class CampusHTML(HTMLParser):
             if tag == "textarea":
                 self._textarea = (self._form, name)
 
+    # El texto se agrega al elemento abierto: valor de un textarea, código de un script o
+    # texto visible de un enlace.
     def handle_data(self, data):
         if self._textarea is not None:
             form, name = self._textarea
@@ -144,6 +157,7 @@ class CampusHTML(HTMLParser):
             self.scripts.append("".join(self._script))
             self._script = None
 
+    # Falla si la respuesta resultó ser la página de login o una página de error.
     def require_access(self):
         if self.login:
             raise fail(
@@ -156,6 +170,8 @@ class CampusHTML(HTMLParser):
             )
 
 
+# Busca en los scripts de la página la llamada M.form_filemanager.init(...) del área temporal
+# indicada y devuelve su configuración JSON (límites y tipos aceptados). Debe haber una sola.
 def filemanager_options(document: CampusHTML, draft_id: str) -> dict:
     configs = []
     for script in document.scripts:
@@ -174,6 +190,8 @@ def filemanager_options(document: CampusHTML, draft_id: str) -> dict:
     return configs[0]
 
 
+# Convierte esa configuración en límites: cantidad de archivos, tamaño por archivo, tamaño
+# total y tipos aceptados (lista vacía = cualquier tipo).
 def parse_limits(config: dict) -> UploadLimits:
     try:
         accepted = config["accepted_types"]
@@ -206,6 +224,9 @@ def prepare_submission(course_id: int, activity_id: int, files: list[str]) -> Pr
         raise fail(
             "UPLOAD_INVALID_FILES", "Indicá curso, actividad y entre 1 y 100 archivos locales."
         )
+    # Por cada ruta: debe ser un archivo regular, de hasta 200 MiB, con un nombre apto para
+    # multipart y no repetido (sin distinguir mayúsculas). Se calcula su SHA-256 y se
+    # confirma que no cambió de tamaño mientras se leía.
     manifests = []
     names = set()
     for path in files:
@@ -255,6 +276,8 @@ def validate_files(
     existing: list[str],
     existing_bytes: int = 0,
 ) -> None:
+    # Valida contra los límites de la actividad, sumando lo que ya está en el área temporal:
+    # cantidad, tamaño total, nombres repetidos, tamaño por archivo y tipos aceptados.
     if limits.max_files >= 0 and len(files) + len(existing) > limits.max_files:
         raise fail(
             "UPLOAD_TOO_MANY_FILES", f"La actividad admite como máximo {limits.max_files} archivos."
@@ -272,6 +295,8 @@ def validate_files(
             )
         if limits.max_file_bytes > 0 and file.size_bytes > limits.max_file_bytes:
             raise fail("UPLOAD_FILE_TOO_LARGE", "Un archivo supera el límite de la actividad.")
+        # Tipos aceptados: "*" admite todo; ".pdf" compara la extensión; "image/*" o
+        # "application/pdf" comparan el MIME deducido del nombre.
         types = limits.accepted_types
         if "*" in types:
             continue
@@ -292,6 +317,7 @@ def validate_files(
         )
 
 
+# Archivos del área temporal (draftfile.php/.../user/draft/<itemid>/...): nombre → enlace.
 def draft_links(document: CampusHTML, itemid: str) -> dict[str, str]:
     result = {}
     for url, name in document.links:
@@ -305,6 +331,8 @@ def draft_links(document: CampusHTML, itemid: str) -> dict[str, str]:
     return result
 
 
+# Devuelve el único enlace del campus con esa ruta y ese parámetro action; si hay cero o
+# varios, falla en lugar de elegir uno.
 def find_link(document: CampusHTML, path: str, action: str) -> str:
     matches = list(
         dict.fromkeys(

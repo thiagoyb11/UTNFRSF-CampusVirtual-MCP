@@ -58,15 +58,18 @@ class CourseService:
         Conserva el orden de la sidebar y los años disponibles para la cuenta. Es la base
         interna de list_courses y del inventario de recursos; reutiliza Course y la sesión.
         """
+        # El login se hace antes de tomar el lock: login() también lo adquiere y no se anida.
         await self._authentication.login()
         try:
             with fail_after(30):
                 async with self._session.acquire() as page:
+                    # La portada del campus contiene el bloque de navegación con My courses.
                     result = await page.goto(
                         url=CAMPUS_BASE_URL,
                         timeout=self._settings.navigation_timeout_ms,
                         wait_until="domcontentloaded",
                     )
+                    # Clasifica la respuesta HTTP antes de leer el contenido.
                     if result.http_status == 429:
                         raise CourseError(
                             "COURSES_RATE_LIMITED", "El campus limitó las solicitudes."
@@ -75,6 +78,7 @@ class CourseService:
                         raise CourseError("COURSES_ACCESS_DENIED", "El campus denegó el acceso.")
                     if result.http_status is None or result.http_status >= 400:
                         raise CourseError("COURSES_HTTP_ERROR", "No se pudo cargar la portada.")
+                    # Confirma que seguimos en el campus, sin límite de solicitudes y con sesión.
                     state = await page.evaluate(script=LOGIN_PAGE_STATE_SCRIPT)
                     if not isinstance(state, dict) or not same_origin(
                         str(state.get("url", "")), CAMPUS_BASE_URL
@@ -90,6 +94,7 @@ class CourseService:
                         raise CourseError(
                             "COURSES_SESSION_EXPIRED", "La sesión dejó de estar activa."
                         )
+                    # Espera el bloque de navegación, extrae la rama Grado y renueva la caché.
                     await page.wait_for_selector(
                         selector='[data-block="navigation"]',
                         timeout=self._settings.navigation_timeout_ms,
@@ -97,6 +102,7 @@ class CourseService:
                     courses = parse_degree_courses(await page.extract(schema=DEGREE_COURSES_SCHEMA))
                     self._cached = (time.monotonic(), courses)
                     return list(courses)
+        # Los errores del navegador se reducen a códigos propios; su texto nunca se reenvía.
         except TimeoutError:
             raise CourseError(
                 "COURSES_TIMEOUT", "Se agotó el tiempo de consulta de Grado."

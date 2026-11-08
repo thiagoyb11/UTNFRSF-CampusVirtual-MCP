@@ -11,6 +11,7 @@ from utnfrsf_campus_mcp.services.diagnostics import get_server_info as read_serv
 def register_diagnostics(server: MCPServer, settings: Settings) -> None:
     """Publica solo capacidades disponibles; no registra herramientas ficticias."""
 
+    # Solo lectura e idempotente: no toca el campus ni el disco (open_world_hint=False).
     @server.tool(
         annotations=ToolAnnotations(
             read_only_hint=True,

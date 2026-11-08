@@ -8,15 +8,19 @@ from urllib.parse import urlsplit
 from utnfrsf_campus_mcp.models import ContentLink
 from utnfrsf_campus_mcp.parsers.resources import clean_link
 
+# Límite de texto por bloque convertido; lo que excede se recorta y se marca truncated.
 MAX_BLOCK_CHARS = 20_000
 # Genially se usa como menú de portada; sus botones repiten secciones del propio campus.
 IGNORED_EMBED_HOSTS = ("genially.com",)
+# Etiquetas cuyo contenido se descarta, las que separan párrafos, títulos y etiquetas sin cierre.
 _SKIPPED = {"script", "style", "noscript", "template", "form", "button", "select", "textarea"}
 _BLOCKS = {"p", "div", "section", "article", "blockquote", "center", "ul", "ol", "table"}
 _HEADINGS = {"h1", "h2", "h3", "h4", "h5", "h6"}
 _VOID = {"br", "hr", "img", "input", "meta", "link", "source", "track", "wbr", "col", "embed"}
 
 
+# Resultado de la conversión: texto Markdown, enlaces encontrados, hosts de contenido
+# embebido omitido y si el texto se recortó.
 @dataclass
 class ParsedContent:
     text: str
@@ -25,14 +29,19 @@ class ParsedContent:
     truncated: bool
 
 
+# Tabla en construcción: filas acumuladas y la celda abierta en este momento.
 @dataclass
 class _Table:
     rows: list[list[str]] = field(default_factory=list)
     cell: list[str] | None = None
 
 
+# Parser incremental: HTMLParser invoca handle_starttag/endtag/data a medida que recorre el
+# HTML, y esta clase va escribiendo el Markdown equivalente.
 class _Markdown(HTMLParser):
     def __init__(self, source_url: str) -> None:
+        # _skip cuenta la profundidad dentro de etiquetas descartadas; _link y _table guardan
+        # el enlace o la tabla abiertos; _lists es la pila de listas (contador si es numerada).
         super().__init__(convert_charrefs=True)
         self._source_url = source_url
         self._out: list[str] = []
@@ -43,6 +52,7 @@ class _Markdown(HTMLParser):
         self.links: list[ContentLink] = []
         self.embeds: list[str] = []
 
+    # El texto va al destino abierto más interno: el enlace, la celda de tabla o la salida.
     def _write(self, text: str) -> None:
         if self._link is not None:
             self._link[1].append(text)
@@ -52,10 +62,13 @@ class _Markdown(HTMLParser):
         else:
             self._out.append(text)
 
+    # Separación de párrafo; dentro de una tabla o un enlace se omite para no romperlos.
     def _break(self) -> None:
         if self._table is None and self._link is None:
             self._out.append("\n\n")
 
+    # Apertura de etiqueta: cada tipo inicia su marca Markdown (título, tabla, lista, enlace,
+    # negrita...). Dentro de un bloque descartado solo se cuenta la profundidad.
     def handle_starttag(self, tag, attrs):
         if self._skip:
             if tag in _SKIPPED:
@@ -95,6 +108,7 @@ class _Markdown(HTMLParser):
         elif tag in _BLOCKS:
             self._break()
 
+    # Cierre de etiqueta: completa la estructura abierta (celda, tabla, lista, enlace).
     def handle_endtag(self, tag):
         if self._skip:
             if tag in _SKIPPED:
@@ -117,15 +131,18 @@ class _Markdown(HTMLParser):
         elif tag in ("em", "i"):
             self._write("*")
 
+    # Etiquetas autocerradas (<br/>): apertura y, si no son vacías por definición, cierre.
     def handle_startendtag(self, tag, attrs):
         self.handle_starttag(tag, attrs)
         if tag not in _VOID:
             self.handle_endtag(tag)
 
+    # Texto: colapsa espacios y saltos, y convierte espacios no separables en normales.
     def handle_data(self, data):
         if not self._skip:
             self._write(re.sub(r"\s+", " ", data.replace("\xa0", " ")))
 
+    # Contenido embebido (iframe, object): no se lee, solo se registra su host para avisarlo.
     def _embed(self, raw: str | None) -> None:
         url = clean_link(raw, self._source_url)
         host = (urlsplit(url).hostname or "") if url else ""
@@ -133,6 +150,7 @@ class _Markdown(HTMLParser):
         if host and not ignored and host not in self.embeds:
             self.embeds.append(host)
 
+    # Ítem de lista: "- " o "N. " según el tipo, con sangría por nivel de anidamiento.
     def _list_item(self) -> None:
         if not self._lists:
             self._write("\n- ")
@@ -144,6 +162,7 @@ class _Markdown(HTMLParser):
             marker = f"{counter[0]}. "
         self._write("\n" + "  " * (len(self._lists) - 1) + marker)
 
+    # Enlace: [texto](url) si la URL es segura; si no, queda solo el texto.
     def _close_link(self) -> None:
         url, parts = self._link
         self._link = None
@@ -154,6 +173,7 @@ class _Markdown(HTMLParser):
         elif name:
             self._write(name)
 
+    # Celda: texto en una línea y "|" escapado para no romper la tabla Markdown.
     def _close_cell(self) -> None:
         table = self._table
         text = " ".join("".join(table.cell or []).split()).replace("|", "\\|")
@@ -161,6 +181,7 @@ class _Markdown(HTMLParser):
         if table.rows:
             table.rows[-1].append(text)
 
+    # Tabla: descarta filas vacías, iguala el ancho y usa la primera fila como encabezado.
     def _close_table(self) -> None:
         rows = [row for row in self._table.rows if any(row)]
         self._table = None
@@ -176,6 +197,8 @@ class _Markdown(HTMLParser):
         return "".join(self._out)
 
 
+# Limpieza final: quita espacios sobrantes, colapsa líneas en blanco repetidas y elimina
+# marcas de negrita vacías ("****").
 def _tidy(text: str) -> str:
     lines = [" ".join(line.split(" ")).rstrip() for line in text.split("\n")]
     blocks: list[str] = []
@@ -187,6 +210,7 @@ def _tidy(text: str) -> str:
 
 def html_to_markdown(html: str, source_url: str, max_chars: int = MAX_BLOCK_CHARS) -> ParsedContent:
     """Conserva títulos, listas, tablas y enlaces; descarta scripts, estilos y formularios."""
+    # Convierte, ordena el resultado y recorta al máximo informando si hubo recorte.
     parser = _Markdown(source_url)
     parser.feed(html)
     parser.close()

@@ -65,6 +65,8 @@ class ResourceService:
     async def get_course_resources(self, course_id: int) -> CourseResources:
         # El helper autentica antes de adquirir el lock. No se anidan adquisiciones.
         course = await self.find_course(course_id)
+        # Estado del recorrido: secciones vistas, enlaces (sin duplicados por URL, sección y
+        # módulo), actividades sin enlace, páginas pendientes de leer y avisos de alcance.
         sections: dict[int, CourseSection] = {}
         links: dict[tuple[str, int, int | None], CourseLink] = {}
         unlinked: dict[tuple[int, int], UnlinkedActivity] = {}
@@ -73,10 +75,12 @@ class ResourceService:
         format_name = None
         visited_pages = 0
 
+        # Registra un aviso una sola vez.
         def warn(message: str) -> None:
             if message not in warnings:
                 warnings.append(message)
 
+        # Agrega un enlace respetando el tope de 10000.
         def add_link(link: CourseLink) -> None:
             key = (link.url, link.section_index, link.module_id)
             if len(links) >= MAX_LINKS and key not in links:
@@ -86,6 +90,8 @@ class ResourceService:
         try:
             with fail_after(QUERY_TIMEOUT_SECONDS):
                 async with self._session.acquire() as page:
+                    # Fase 1: recorrido en anchura de las secciones. Se empieza por la portada
+                    # del curso y se encolan las secciones que aparecen en la navegación.
                     queue = [course.url]
                     visited_sections: set[str] = set()
                     while queue:
@@ -101,6 +107,7 @@ class ResourceService:
                         current_format, found_sections, found_links, found_unlinked, navigation = (
                             parsed
                         )
+                        # Todas las páginas del curso deben tener el mismo formato.
                         if format_name is not None and format_name != current_format:
                             raise invalid_resources()
                         format_name = current_format
@@ -110,6 +117,7 @@ class ResourceService:
                             warn("RESOURCES_SECTION_MISSING: Una sección no devolvió su contenido.")
                             visited_sections.add(url)
                             continue
+                        # Página leída: se incorporan sus secciones, enlaces y actividades.
                         visited_pages += 1
                         visited_sections.add(url)
                         pending.pop(url, None)
@@ -122,6 +130,8 @@ class ResourceService:
                             add_link(link)
                         for activity in found_unlinked:
                             unlinked[(activity.section_index, activity.module_id)] = activity
+                        # Secciones vistas en la navegación: se registran y, si están habilitadas
+                        # y todavía no se leyeron, se encolan para la próxima vuelta.
                         for section in navigation:
                             previous = sections.get(section.index)
                             if previous is None:
@@ -141,6 +151,8 @@ class ResourceService:
                                 "RESOURCES_SECTIONS_UNVERIFIED: "
                                 "No se encontró navegación de secciones."
                             )
+                    # Fase 2: se abre la página de cada recurso, carpeta, tarea, página y URL para
+                    # obtener los archivos y enlaces que no aparecen en la portada del curso.
                     # Solo se amplían módulos observados y conocidos. Nunca se siguen URLs externas,
                     # enlaces a edición/envío, archivos binarios ni enlaces arbitrarios del HTML.
                     modules: dict[str, list[CourseLink]] = {}
@@ -161,6 +173,8 @@ class ResourceService:
                         data = await read_module_links(page, url)
                         if not isinstance(data, dict):
                             raise invalid_resources()
+                        # Sesión vencida, acceso denegado o 429 cortan todo; otros fallos de un
+                        # módulo solo lo dejan pendiente y se informa con un aviso.
                         code = data.get("error")
                         if code in _FATAL_CODES:
                             raise CourseError(code, "No se pudo verificar el acceso al recurso.")
@@ -173,6 +187,7 @@ class ResourceService:
                         rows = data.get("links")
                         if not isinstance(rows, list):
                             raise invalid_resources()
+                        # Los enlaces encontrados heredan sección y módulo de quien los listó.
                         for parent in parents:
                             for row in rows:
                                 link = make_link(
@@ -186,6 +201,8 @@ class ResourceService:
                                     add_link(link)
                         pending.pop(url, None)
                     await self.require_session(page)
+        # Si falla antes de leer la primera página, es un error. Si ya hay datos, se devuelve
+        # el alcance parcial con complete=false y el motivo en warnings, salvo fallos de acceso.
         except CourseError as exc:
             if format_name is None or exc.code in _FATAL_CODES:
                 raise
@@ -216,6 +233,8 @@ class ResourceService:
             warnings=warnings,
         )
 
+    # Resuelve un course_id a su materia de Grado (con el listado reciente en caché); un ID
+    # que no está en Grado no se acepta.
     async def find_course(self, course_id: int) -> Course:
         if type(course_id) is not int or course_id <= 0:
             raise CourseError("RESOURCES_INVALID_COURSE", "Indicá un course_id entero positivo.")
@@ -234,6 +253,7 @@ class ResourceService:
         """
         course = await self.find_course(course_id)
         url = module_view_url(module_type, module_id)
+        # Abre la página del módulo, lee a qué materia y tipo pertenece y lista sus enlaces.
         try:
             with fail_after(QUERY_TIMEOUT_SECONDS):
                 async with self._session.acquire() as page:
@@ -248,12 +268,14 @@ class ResourceService:
             raise invalid_resources()
         if owner.get("access_denied"):
             raise CourseError("RESOURCES_ACCESS_DENIED", "El campus denegó el acceso al módulo.")
+        # El módulo debe ser del tipo esperado y de la materia indicada.
         if owner.get("body") != f"page-mod-{module_type}-view" or str(
             owner.get("course_id")
         ) != str(course_id):
             raise CourseError(
                 "RESOURCES_MODULE_NOT_FOUND", "El módulo no es de ese tipo o de la materia."
             )
+        # La lista de enlaces debe estar completa: un recorte podría ocultar un archivo pedido.
         code = data.get("error")
         if code in _FATAL_CODES:
             raise CourseError(code, "No se pudo verificar el acceso al módulo.")
@@ -270,6 +292,7 @@ class ResourceService:
         """Lee resumen, etiquetas y descripciones de una sección; no sigue enlaces."""
         if type(section) is not int or section < 0:
             raise CourseError("RESOURCES_INVALID_SECTION", "Indicá una sección entera positiva.")
+        # Abre la sección pedida y extrae su HTML con el índice ya validado como entero.
         course = await self.find_course(course_id)
         url = urljoin(CAMPUS_BASE_URL, f"course/view.php?id={course_id}&section={section}")
         script = SECTION_CONTENT_SCRIPT.replace("__SECTION__", str(section))
@@ -283,6 +306,7 @@ class ResourceService:
             raise CourseError("RESOURCES_TIMEOUT", "Se agotó el tiempo de consulta.") from None
         except LightpandaError as exc:
             raise self.browser_error(exc) from None
+        # Debe ser la página de esta materia, accesible y con la sección visible.
         if not isinstance(data, dict) or data.get("present") is not True:
             raise invalid_resources()
         if str(data.get("course_id")) != str(course_id):
@@ -297,10 +321,13 @@ class ResourceService:
 
     @staticmethod
     def _section_content(course: Course, section: int, url: str, data: dict) -> SectionContent:
+        # Arma la respuesta: un bloque para el resumen de la sección y uno por cada etiqueta o
+        # descripción de actividad, cada uno convertido a Markdown.
         blocks: list[ContentBlock] = []
         warnings: list[str] = []
         embeds: list[str] = []
 
+        # Convierte un fragmento y lo agrega si tiene texto o una restricción de acceso visible.
         def add(kind, html, module_id=None, name=None, availability=None) -> None:
             parsed = html_to_markdown(html or "", url)
             embeds.extend(host for host in parsed.embeds if host not in embeds)
@@ -319,6 +346,7 @@ class ResourceService:
                     )
                 )
 
+        # Las etiquetas (label) son texto suelto de la cátedra; el resto son descripciones.
         add("summary", data.get("summary"))
         for row in data.get("activities") or []:
             kind = "label" if "modtype_label" in str(row.get("classes")) else "description"
@@ -329,6 +357,7 @@ class ResourceService:
                 row.get("name"),
                 row.get("availability"),
             )
+        # Avisos de alcance: recortes y contenido embebido que no se leyó.
         if data.get("truncated"):
             warnings.append("CONTENT_TRUNCATED: La sección superó el límite de actividades.")
         if embeds:
@@ -357,6 +386,8 @@ class ResourceService:
     async def _module_text(
         self, course_id: int, module_id: int, kind: str, script: str
     ) -> PageContent:
+        # Lectura común de módulos de texto (page y folder): abre la página del módulo,
+        # verifica tipo y materia, y convierte su HTML a Markdown.
         if type(module_id) is not int or module_id <= 0:
             raise CourseError("RESOURCES_INVALID_MODULE", "Indicá un module_id entero positivo.")
         course = await self.find_course(course_id)
@@ -405,17 +436,21 @@ class ResourceService:
 
     @staticmethod
     def browser_error(exc: LightpandaError) -> CourseError:
+        # Traduce un fallo de Lightpanda; en el log queda solo el tipo, nunca el mensaje completo.
         if is_rate_limited_message(str(exc)):
             return CourseError("RESOURCES_RATE_LIMITED", "El campus limitó las solicitudes.")
         logger.warning("Fallo del navegador: %s", str(exc).split(":", 1)[0][:60])
         return CourseError("RESOURCES_BROWSER_ERROR", "Lightpanda no pudo completar la consulta.")
 
+    # Como open_page, pero además espera a que cargue el contenido del curso.
     async def _open_course(self, page: AsyncSession, url: str) -> None:
         await self.open_page(page, url)
         await page.wait_for_selector(
             selector="#region-main .course-content", timeout=self._settings.navigation_timeout_ms
         )
 
+    # Navegación segura usada por recursos y foros: solo destinos del campus, estado HTTP
+    # clasificado, sesión verificada y espera de la región principal de la página.
     async def open_page(self, page: AsyncSession, url: str) -> None:
         if not same_origin(url, CAMPUS_BASE_URL):
             raise CourseError("RESOURCES_ACCESS_DENIED", "El destino está fuera del campus.")
@@ -436,6 +471,7 @@ class ResourceService:
 
     @staticmethod
     async def require_session(page: AsyncSession) -> None:
+        # La página actual debe seguir en el campus, sin límite de solicitudes y con sesión.
         state = await page.evaluate(script=LOGIN_PAGE_STATE_SCRIPT)
         if not isinstance(state, dict):
             raise invalid_resources()

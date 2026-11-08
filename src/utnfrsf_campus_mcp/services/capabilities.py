@@ -26,6 +26,9 @@ _CAMPUS_CHECK_2026_11_04 = date(2026, 11, 4)
 _CAMPUS_CHECK_2026_11_05 = date(2026, 11, 5)
 
 
+# Catálogo agrupado por área. Cada entrada declara: herramienta, IDs del inventario de
+# funcionalidades, efecto (ver CapabilityEffect en models.py), nivel de evidencia, fecha
+# de verificación real, alcance, límites pendientes y documento de referencia.
 CAPABILITIES: tuple[Capability, ...] = (
     # --- Diagnóstico y sesión -------------------------------------------------
     Capability(

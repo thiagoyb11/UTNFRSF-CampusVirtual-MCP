@@ -33,8 +33,10 @@ from utnfrsf_campus_mcp.tools.submissions import register_submissions
 def create_server(settings: Settings | None = None) -> MCPServer:
     """Construye el servidor sin abrir el navegador ni realizar peticiones de red."""
     config = settings if settings is not None else Settings()
+    # Una sola sesión de navegador compartida por todas las herramientas; se abre bajo demanda.
     session = CampusSession(LightpandaBrowser(config), config.browser_idle_seconds)
 
+    # Al apagar el servidor se cierra Lightpanda aunque haya quedado abierto.
     @asynccontextmanager
     async def lifespan(server: MCPServer) -> AsyncIterator[None]:
         try:
@@ -42,6 +44,8 @@ def create_server(settings: Settings | None = None) -> MCPServer:
         finally:
             await session.close()
 
+    # Arma los servicios en orden de dependencia (login → materias → recursos → descargas y
+    # foros) y registra cada herramienta MCP junto al servicio en el que delega.
     server = MCPServer("UTN FRSF Campus Virtual MCP", lifespan=lifespan)
     register_diagnostics(server, config)
     authentication = AuthenticationService(config, session)
@@ -59,10 +63,13 @@ def create_server(settings: Settings | None = None) -> MCPServer:
 
 def main() -> None:
     """Ejecuta el protocolo en stdout y conserva los logs en stderr."""
+    # Línea de comandos mínima: solo --version y --help.
     parser = argparse.ArgumentParser(description="MCP del Campus Virtual UTN FRSF (stdio).")
     parser.add_argument("--version", action="version", version=version("utnfrsf-campusvirtual-mcp"))
     parser.parse_args()
 
+    # Una configuración inválida corta el arranque nombrando solo los campos, nunca los valores
+    # (podrían ser credenciales).
     try:
         settings = Settings()
     except ValidationError as exc:
@@ -70,6 +77,7 @@ def main() -> None:
         print(f"Configuración inválida ({fields}). Revisá .env y UTN_CAMPUS_*.", file=sys.stderr)
         raise SystemExit(2) from None
 
+    # stdout queda reservado para el protocolo MCP: los logs van a stderr.
     logging.basicConfig(
         level=settings.log_level,
         stream=sys.stderr,

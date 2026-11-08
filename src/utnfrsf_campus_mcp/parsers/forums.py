@@ -10,6 +10,7 @@ from utnfrsf_campus_mcp.parsers.content import html_to_markdown
 from utnfrsf_campus_mcp.parsers.resources import clean_link, integer, invalid_resources
 
 
+# Moodle publica las fechas de la lista como timestamp Unix; se convierten a la zona del campus.
 def _instant(raw: Any, zone: ZoneInfo) -> datetime | None:
     if raw in (None, ""):
         return None
@@ -21,6 +22,8 @@ def parse_discussions(rows: Any, source_url: str, zone: ZoneInfo) -> list[ForumD
         raise invalid_resources()
     result = []
     for row in rows:
+        # El enlace debe ser discuss.php?d=<id> con el mismo id de la fila; si no coincide,
+        # la página no tiene la estructura esperada y se falla en lugar de adivinar.
         url = clean_link(row.get("url"), source_url)
         identifier = integer(row.get("id"), 1)
         parts = urlsplit(url or "")
@@ -31,6 +34,7 @@ def parse_discussions(rows: Any, source_url: str, zone: ZoneInfo) -> list[ForumD
             or not row.get("title")
         ):
             raise invalid_resources()
+        # La cantidad de respuestas es opcional: si no es un número, se informa como desconocida.
         replies = str(row.get("replies") or "")
         result.append(
             ForumDiscussionSummary(
@@ -53,6 +57,7 @@ def parse_posts(rows: Any, source_url: str) -> tuple[list[ForumPost], list[str]]
     posts: list[ForumPost] = []
     warnings: list[str] = []
     for row in rows:
+        # Todo mensaje debe traer cuerpo; la fecha viene del atributo datetime, en ISO 8601.
         if row.get("html") is None:
             raise invalid_resources()
         raw_date = row.get("posted_at")
@@ -60,6 +65,7 @@ def parse_posts(rows: Any, source_url: str) -> tuple[list[ForumPost], list[str]]
             posted_at = datetime.fromisoformat(raw_date) if raw_date else None
         except (TypeError, ValueError):
             raise invalid_resources() from None
+        # El cuerpo pasa a Markdown; los recortes y embebidos omitidos se informan como warnings.
         parsed = html_to_markdown(row["html"], source_url)
         if parsed.truncated:
             warnings.append("CONTENT_TRUNCATED: Un mensaje superó el límite de texto.")
@@ -67,6 +73,7 @@ def parse_posts(rows: Any, source_url: str) -> tuple[list[ForumPost], list[str]]
             warnings.append(
                 "CONTENT_EMBEDS_OMITTED: Hay contenido embebido de " + ", ".join(parsed.embeds)
             )
+        # Adjuntos: solo enlaces limpios (sin secretos) y con nombre visible.
         attachments = []
         for item in row.get("attachments") or []:
             url = clean_link(item.get("url"), source_url)
@@ -86,4 +93,5 @@ def parse_posts(rows: Any, source_url: str) -> tuple[list[ForumPost], list[str]]
                 truncated=parsed.truncated,
             )
         )
+    # dict.fromkeys elimina warnings repetidos conservando el orden de aparición.
     return posts, list(dict.fromkeys(warnings))

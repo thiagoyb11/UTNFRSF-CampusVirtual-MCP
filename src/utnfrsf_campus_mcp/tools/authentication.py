@@ -10,6 +10,7 @@ from utnfrsf_campus_mcp.services.authentication import AuthenticationService
 
 
 def register_authentication(server: MCPServer, service: AuthenticationService) -> None:
+    # No es de solo lectura: iniciar sesión cambia el estado del navegador compartido.
     @server.tool(
         annotations=ToolAnnotations(
             read_only_hint=False,
@@ -25,6 +26,7 @@ def register_authentication(server: MCPServer, service: AuthenticationService) -
         inactivo. Reintenta TooManyRequests de forma acotada, volviendo a la página
         de acceso.
         """
+        # Los errores de dominio ya traen un código y un mensaje seguros: se reenvían tal cual.
         try:
             return await service.login()
         except LoginError as exc:

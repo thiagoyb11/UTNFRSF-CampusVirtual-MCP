@@ -11,6 +11,7 @@ from utnfrsf_campus_mcp.errors import CourseError, LoginError
 from utnfrsf_campus_mcp.models import ForumDiscussion, ForumDiscussions
 from utnfrsf_campus_mcp.services.forums import ForumService
 
+# Anotaciones y tipo de parámetro compartidos por las dos herramientas de foros.
 READ_ONLY = ToolAnnotations(
     read_only_hint=True,
     destructive_hint=False,
@@ -21,6 +22,7 @@ COURSE_ID = Annotated[int, Field(gt=0, description="ID de la asignatura de Grado
 
 
 def register_forums(server: MCPServer, service: ForumService) -> None:
+    # Primer paso: listar las discusiones de un foro a partir de su module_id.
     @server.tool(annotations=READ_ONLY)
     async def list_forum_discussions(
         course_id: COURSE_ID,
@@ -39,6 +41,7 @@ def register_forums(server: MCPServer, service: ForumService) -> None:
         except Exception:
             raise ToolError("FORUM_INTERNAL_ERROR: No se pudo completar la consulta.") from None
 
+    # Segundo paso: leer una discusión concreta con el discussion_id del listado.
     @server.tool(annotations=READ_ONLY)
     async def get_forum_discussion(
         course_id: COURSE_ID,

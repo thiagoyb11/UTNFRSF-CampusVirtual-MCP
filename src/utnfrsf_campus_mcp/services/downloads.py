@@ -17,11 +17,13 @@ class DownloadService:
     def __init__(self, resources: ResourceService, session: CampusSession) -> None:
         self._resources = resources
         self._session = session
+        # Raíz fija de descargas: el usuario no elige destino, para impedir escrituras arbitrarias.
         self._root = (Path.cwd() / "downloads").resolve()
 
     async def download_resources(
         self, course_id: int, module_id: int, urls: list[str]
     ) -> DownloadedResources:
+        # 1. Validación local de la selección: IDs positivos y de 1 a 10 URLs sin repetir.
         if (
             type(course_id) is not int
             or course_id <= 0
@@ -36,22 +38,27 @@ class DownloadService:
                 "DOWNLOAD_INVALID_SELECTION",
                 "Indicá un curso, módulo y entre 1 y 10 archivos únicos.",
             )
+        # Cada URL debe coincidir con su versión limpia: sin credenciales, tokens ni otros esquemas.
         for url in urls:
             if clean_link(url, CAMPUS_BASE_URL) != url:
                 raise DownloadError(
                     "DOWNLOAD_INVALID_SELECTION", "Solo se aceptan enlaces válidos sin secretos."
                 )
+        # 2. Verificación en el campus: todas las URLs deben figurar hoy en ese módulo.
         course, allowed = await self._module_files(course_id, module_id, urls)
         if not set(urls) <= allowed:
             raise DownloadError(
                 "DOWNLOAD_NOT_IN_COURSE",
                 "Los archivos deben figurar en el módulo indicado del curso.",
             )
+        # 3. Carpeta de destino downloads/course-<id>/module-<id>, que no puede escapar de la raíz.
         destination = self._root / f"course-{course_id}" / f"module-{module_id}"
         if not destination.resolve().is_relative_to(self._root):
             raise DownloadError(
                 "DOWNLOAD_INVALID_DESTINATION", "El destino está fuera de downloads."
             )
+        # 4. Descarga: se copian en memoria las cookies de la sesión de Lightpanda y cada
+        # archivo se baja por HTTP en un hilo aparte, para no bloquear el servidor.
         files, failures = [], []
         async with self._session.acquire() as page:
             await self._resources.require_session(page)
@@ -61,9 +68,12 @@ class DownloadService:
                     # La cancelación espera la limpieza del temporal en el worker.
                     files.append(await to_thread.run_sync(download_file, url, cookies, destination))
                 except DownloadError as exc:
+                    # Un fallo de un archivo se registra y se sigue con el próximo...
                     failures.append(
                         DownloadFailure(source_url=url, code=exc.code, message=str(exc))
                     )
+                    # ...salvo los fallos de acceso, que afectarían a todos: se detiene la
+                    # descarga y los archivos restantes quedan marcados como no intentados.
                     if exc.code in (
                         "DOWNLOAD_SESSION_EXPIRED",
                         "DOWNLOAD_ACCESS_DENIED",

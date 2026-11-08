@@ -13,6 +13,8 @@ from utnfrsf_campus_mcp.services.downloads import DownloadService
 
 
 def register_downloads(server: MCPServer, service: DownloadService) -> None:
+    # Escribe archivos locales, así que no es de solo lectura; nunca sobrescribe, así que no
+    # es destructiva. No es idempotente: repetirla crea copias con sufijo numérico.
     @server.tool(
         annotations=ToolAnnotations(
             read_only_hint=False,
@@ -45,6 +47,8 @@ def register_downloads(server: MCPServer, service: DownloadService) -> None:
         tamaños, hashes y fallos por archivo. Solo archivos del campus, sin destinos externos.
         No modifica entregas del campus.
         """
+        # Los fallos por archivo vuelven dentro del resultado (failures); solo los errores
+        # que impiden toda la operación llegan acá y se convierten en errores MCP.
         try:
             return await service.download_resources(course_id, module_id, urls)
         except (CourseError, DownloadError, LoginError) as exc:
