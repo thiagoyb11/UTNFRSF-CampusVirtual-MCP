@@ -36,7 +36,7 @@ Las anotaciones MCP declaran lectura, operación no destructiva e idempotente y 
 
 ## Implementación y verificación
 
-`tools/courses.py` delega en `CourseService.list_courses()`, que agrega procedencia y alcance al helper `list_degree_courses()`. Este último sigue siendo reutilizado por recursos. La autenticación ocurre antes de adquirir la sesión, sin anidar el lock ni construir otro navegador. Los selectores y la validación están en `parsers/courses.py`; se conserva la [estructura previamente observada](guia-get-course-resources.md).
+`tools/courses.py` delega en `CourseService.list_courses()`, que agrega procedencia y alcance al helper `list_degree_courses()`. Este último sigue siendo reutilizado por recursos, mediante `recent_degree_courses()`: para validar un `course_id`, las demás herramientas reutilizan el último listado durante 10 minutos (`COURSES_CACHE_SECONDS`) y solo confirman la sesión. `list_courses` siempre consulta el campus y renueva ese listado. La autenticación ocurre antes de adquirir la sesión, sin anidar el lock ni construir otro navegador. Los selectores y la validación están en `parsers/courses.py`; se conserva la [estructura previamente observada](guia-get-course-resources.md).
 
 El **31 de octubre de 2026**, a las **21:25:47 y 21:25:49 UTC−03:00** (`2026-11-01T00:25:47Z` y `2026-11-01T00:25:49Z`), el cliente oficial de MCP descubrió `list_courses` y realizó dos llamadas consecutivas contra el campus real mediante el entrypoint stdio. Ambas devolvieron **30 materias**, alcance `Grado`, `complete=true`, IDs únicos y las dos ediciones visibles de Seminario Integrador. El proceso compartió sesión y se cerró al terminar; no se modificaron entregas ni otros datos académicos.
 

@@ -103,6 +103,11 @@ FOLDER_CONTENT_SCRIPT = r"""(() => {
         access_denied: !!main?.querySelector('.alert-danger, .errorbox')};
 })()"""
 
+# Tipo y materia de la página de módulo abierta: el module_id recibido no se da por válido.
+MODULE_OWNER_SCRIPT = r"""(() => ({body: document.body.id, course_id: M.cfg.courseId,
+    access_denied: !!document.querySelector('#region-main .alert-danger, #region-main .errorbox')
+}))()"""
+
 # GET de páginas conocidas: no sigue redirecciones (tampoco a un origen externo),
 # no descarga binarios ni ejecuta el HTML recibido. forceview es el parámetro de lectura
 # de mod/resource/view.php de Moodle para obtener el enlace incluso en modo download.

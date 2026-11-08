@@ -1,5 +1,6 @@
 """Consulta de materias de Grado para MCP y otros servicios académicos."""
 
+import time
 from datetime import UTC, datetime
 
 from anyio import fail_after
@@ -17,6 +18,10 @@ from utnfrsf_campus_mcp.parsers.login import (
 )
 from utnfrsf_campus_mcp.services.authentication import AuthenticationService
 
+# Las materias de Grado cambian pocas veces por cuatrimestre: validar un course_id no
+# justifica volver a leer la portada en cada herramienta.
+COURSES_CACHE_SECONDS = 600
+
 
 class CourseService:
     def __init__(
@@ -25,6 +30,17 @@ class CourseService:
         self._settings = settings
         self._session = session
         self._authentication = authentication
+        self._cached: tuple[float, list[Course]] | None = None
+
+    async def recent_degree_courses(self) -> list[Course]:
+        """Reutiliza el último listado de Grado si es reciente; si no, lo vuelve a consultar.
+
+        Siempre confirma la sesión: el navegador se cierra por inactividad y con él las cookies.
+        """
+        if self._cached is None or time.monotonic() - self._cached[0] > COURSES_CACHE_SECONDS:
+            return await self.list_degree_courses()
+        await self._authentication.login()
+        return list(self._cached[1])
 
     async def list_courses(self) -> CourseList:
         """Publica el alcance y la procedencia de un listado completo de Grado."""
@@ -78,7 +94,9 @@ class CourseService:
                         selector='[data-block="navigation"]',
                         timeout=self._settings.navigation_timeout_ms,
                     )
-                    return parse_degree_courses(await page.extract(schema=DEGREE_COURSES_SCHEMA))
+                    courses = parse_degree_courses(await page.extract(schema=DEGREE_COURSES_SCHEMA))
+                    self._cached = (time.monotonic(), courses)
+                    return list(courses)
         except TimeoutError:
             raise CourseError(
                 "COURSES_TIMEOUT", "Se agotó el tiempo de consulta de Grado."

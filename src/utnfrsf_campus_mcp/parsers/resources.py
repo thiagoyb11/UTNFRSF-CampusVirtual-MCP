@@ -39,6 +39,8 @@ _FILE_SUFFIXES = {
 }
 _SECRET = re.compile(r"sesskey|token|password|secret|authorization|signature|api[_-]?key", re.I)
 _MODULE_PATH = re.compile(r"/mod/([a-z][a-z0-9_]*)/view\.php\Z")
+# Módulos cuyos archivos de pluginfile.php se listan en la propia página del módulo.
+_MODULE_FILE_PATH = re.compile(r"/pluginfile\.php/[0-9]+/mod_(resource|folder|assign|page)/")
 
 
 def invalid_resources() -> CourseError:
@@ -88,6 +90,20 @@ def module_target(url: str) -> tuple[str, int] | None:
     if not match or len(ids) != 1 or not re.fullmatch(r"[1-9][0-9]*", ids[0]):
         return None
     return match[1], int(ids[0])
+
+
+def module_view_url(module_type: str, module_id: int) -> str:
+    """Página de lectura de un módulo; forceview evita que mod/resource redirija al archivo."""
+    url = urljoin(CAMPUS_BASE_URL, f"mod/{module_type}/view.php?" + urlencode({"id": module_id}))
+    return url + "&forceview=1" if module_type == "resource" else url
+
+
+def file_module_type(url: str) -> str | None:
+    """Tipo del módulo dueño de un archivo, según su ruta de pluginfile.php."""
+    if not same_origin(url, CAMPUS_BASE_URL):
+        return None
+    match = _MODULE_FILE_PATH.match(urlsplit(url).path)
+    return match[1] if match else None
 
 
 def section_target(raw: Any, course_id: int, source_url: str) -> tuple[int, str] | None:

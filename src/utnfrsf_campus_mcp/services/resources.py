@@ -2,7 +2,7 @@
 
 import logging
 from datetime import UTC, datetime
-from urllib.parse import urlencode, urljoin
+from urllib.parse import urljoin
 
 from anyio import fail_after
 from lightpanda import AsyncSession, LightpandaError
@@ -10,6 +10,7 @@ from lightpanda import AsyncSession, LightpandaError
 from utnfrsf_campus_mcp.browser.resources import (
     COURSE_CONTENT_SCRIPT,
     FOLDER_CONTENT_SCRIPT,
+    MODULE_OWNER_SCRIPT,
     PAGE_CONTENT_SCRIPT,
     SECTION_CONTENT_SCRIPT,
     read_module_links,
@@ -38,6 +39,7 @@ from utnfrsf_campus_mcp.parsers.resources import (
     invalid_resources,
     make_link,
     module_target,
+    module_view_url,
     parse_course_page,
     section_target,
 )
@@ -149,13 +151,7 @@ class ResourceService:
                             and target == (link.module_type, link.module_id)
                             and target[0] in ("resource", "folder", "assign", "page", "url")
                         ):
-                            read_url = urljoin(
-                                CAMPUS_BASE_URL,
-                                f"mod/{target[0]}/view.php?" + urlencode({"id": target[1]}),
-                            )
-                            if target[0] == "resource":
-                                read_url += "&forceview=1"
-                            modules.setdefault(read_url, []).append(link)
+                            modules.setdefault(module_view_url(*target), []).append(link)
                     pending.update(dict.fromkeys(modules))
                     for url, parents in modules.items():
                         if visited_pages >= MAX_PAGES:
@@ -223,11 +219,52 @@ class ResourceService:
     async def find_course(self, course_id: int) -> Course:
         if type(course_id) is not int or course_id <= 0:
             raise CourseError("RESOURCES_INVALID_COURSE", "Indicá un course_id entero positivo.")
-        courses = await self._courses.list_degree_courses()
+        courses = await self._courses.recent_degree_courses()
         matches = [course for course in courses if course.id == course_id]
         if len(matches) != 1:
             raise CourseError("RESOURCES_COURSE_NOT_FOUND", "La asignatura no aparece en Grado.")
         return matches[0]
+
+    async def module_file_urls(
+        self, course_id: int, module_id: int, module_type: str
+    ) -> tuple[Course, set[str]]:
+        """Lee solo la página del módulo: confirma que es de la materia y lista sus archivos.
+
+        Es la verificación de pertenencia de las descargas; evita recorrer el curso entero.
+        """
+        course = await self.find_course(course_id)
+        url = module_view_url(module_type, module_id)
+        try:
+            with fail_after(QUERY_TIMEOUT_SECONDS):
+                async with self._session.acquire() as page:
+                    await self.open_page(page, url)
+                    owner = await page.evaluate(script=MODULE_OWNER_SCRIPT)
+                    data = await read_module_links(page, url)
+        except TimeoutError:
+            raise CourseError("RESOURCES_TIMEOUT", "Se agotó el tiempo de consulta.") from None
+        except LightpandaError as exc:
+            raise self.browser_error(exc) from None
+        if not isinstance(owner, dict) or not isinstance(data, dict):
+            raise invalid_resources()
+        if owner.get("access_denied"):
+            raise CourseError("RESOURCES_ACCESS_DENIED", "El campus denegó el acceso al módulo.")
+        if owner.get("body") != f"page-mod-{module_type}-view" or str(
+            owner.get("course_id")
+        ) != str(course_id):
+            raise CourseError(
+                "RESOURCES_MODULE_NOT_FOUND", "El módulo no es de ese tipo o de la materia."
+            )
+        code = data.get("error")
+        if code in _FATAL_CODES:
+            raise CourseError(code, "No se pudo verificar el acceso al módulo.")
+        rows = data.get("links")
+        if code or data.get("truncated") is not False or not isinstance(rows, list):
+            raise CourseError(
+                "RESOURCES_MODULE_INCOMPLETE", "No se pudieron leer los archivos del módulo."
+            )
+        # La sección no interviene en la verificación; make_link solo normaliza y clasifica.
+        links = (make_link(row, url, 0, module_id, module_type) for row in rows)
+        return course, {link.url for link in links if link and link.kind == "file"}
 
     async def get_section_content(self, course_id: int, section: int) -> SectionContent:
         """Lee resumen, etiquetas y descripciones de una sección; no sigue enlaces."""

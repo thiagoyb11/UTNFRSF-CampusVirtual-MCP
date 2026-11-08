@@ -7,9 +7,9 @@ from anyio import to_thread
 from utnfrsf_campus_mcp.browser.downloads import download_file, session_cookie_jar
 from utnfrsf_campus_mcp.browser.session import CampusSession
 from utnfrsf_campus_mcp.config import CAMPUS_BASE_URL
-from utnfrsf_campus_mcp.errors import DownloadError
-from utnfrsf_campus_mcp.models import DownloadedResources, DownloadFailure
-from utnfrsf_campus_mcp.parsers.resources import clean_link
+from utnfrsf_campus_mcp.errors import CourseError, DownloadError
+from utnfrsf_campus_mcp.models import Course, DownloadedResources, DownloadFailure
+from utnfrsf_campus_mcp.parsers.resources import clean_link, file_module_type
 from utnfrsf_campus_mcp.services.resources import ResourceService
 
 
@@ -41,10 +41,7 @@ class DownloadService:
                 raise DownloadError(
                     "DOWNLOAD_INVALID_SELECTION", "Solo se aceptan enlaces válidos sin secretos."
                 )
-        inventory = await self._resources.get_course_resources(course_id)
-        allowed = {
-            row.url for row in inventory.links if row.module_id == module_id and row.kind == "file"
-        }
+        course, allowed = await self._module_files(course_id, module_id, urls)
         if not set(urls) <= allowed:
             raise DownloadError(
                 "DOWNLOAD_NOT_IN_COURSE",
@@ -83,9 +80,34 @@ class DownloadService:
                             )
                         break
         return DownloadedResources(
-            course=inventory.course,
+            course=course,
             module_id=module_id,
             complete=not failures,
             files=files,
             failures=failures,
         )
+
+    async def _module_files(
+        self, course_id: int, module_id: int, urls: list[str]
+    ) -> tuple[Course, set[str]]:
+        """Archivos que el campus muestra hoy en el módulo, para verificar la selección.
+
+        Si la ruta de los archivos indica el tipo de módulo, alcanza con leer su página.
+        Si no, se recurre al inventario completo del curso, más lento pero general.
+        """
+        types = {file_module_type(url) for url in urls}
+        if len(types) == 1 and (module_type := types.pop()):
+            try:
+                return await self._resources.module_file_urls(course_id, module_id, module_type)
+            except CourseError as exc:
+                if exc.code == "RESOURCES_MODULE_NOT_FOUND":
+                    raise DownloadError(
+                        "DOWNLOAD_NOT_IN_COURSE",
+                        "Los archivos deben figurar en el módulo indicado del curso.",
+                    ) from None
+                raise
+        inventory = await self._resources.get_course_resources(course_id)
+        allowed = {
+            row.url for row in inventory.links if row.module_id == module_id and row.kind == "file"
+        }
+        return inventory.course, allowed
