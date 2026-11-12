@@ -5,6 +5,7 @@ import json
 import time
 import uuid
 from dataclasses import dataclass, field
+from datetime import UTC, datetime
 from urllib.parse import parse_qs, urljoin, urlsplit
 
 from anyio import CancelScope, to_thread
@@ -17,23 +18,26 @@ from utnfrsf_campus_mcp.browser.file_input import (
     upload_browser_file,
 )
 from utnfrsf_campus_mcp.browser.session import CampusSession
-from utnfrsf_campus_mcp.browser.submissions import SUBMISSION_STATE_SCRIPT
+from utnfrsf_campus_mcp.browser.submissions import FEEDBACK_SCRIPT, SUBMISSION_STATE_SCRIPT
 from utnfrsf_campus_mcp.browser.uploads import CampusHTTP, FileUploadHelper
 from utnfrsf_campus_mcp.config import CAMPUS_BASE_URL, Settings
 from utnfrsf_campus_mcp.errors import SubmissionError
 from utnfrsf_campus_mcp.models import (
+    AssignmentFeedback,
     PreparedSubmission,
     SubmissionFile,
     SubmissionResult,
     SubmissionStatus,
     UploadedFiles,
 )
+from utnfrsf_campus_mcp.parsers.calendar import resolve_timezone
 from utnfrsf_campus_mcp.parsers.login import LOGIN_PAGE_STATE_SCRIPT, same_origin
 from utnfrsf_campus_mcp.parsers.resources import clean_link
 from utnfrsf_campus_mcp.parsers.submissions import (
     CampusForm,
     fail,
     filemanager_options,
+    parse_feedback,
     parse_limits,
     parse_submission_state,
     prepare_submission,
@@ -186,6 +190,33 @@ class SubmissionService:
         await self._authentication.login()
         async with self._session.acquire() as page:
             return (await self._read_status(page, course_id, activity_id))[0]
+
+    async def get_assignment_feedback(self, course_id: int, activity_id: int) -> AssignmentFeedback:
+        """Lee la devolución del docente en la misma página validada por _read_status."""
+        if (
+            type(course_id) is not int
+            or course_id <= 0
+            or type(activity_id) is not int
+            or activity_id <= 0
+        ):
+            raise fail(
+                "SUBMISSION_INVALID_ACTIVITY", "Indicá IDs enteros positivos de curso y actividad."
+            )
+        await self._authentication.login()
+        async with self._session.acquire() as page:
+            status = (await self._read_status(page, course_id, activity_id))[0]
+            raw = await page.evaluate(script=FEEDBACK_SCRIPT)
+        # El script corre sobre la página ya verificada; se confirma que no navegó a otra.
+        if (
+            not isinstance(raw, dict)
+            or not same_origin(str(raw.get("url", "")), CAMPUS_BASE_URL)
+            or parse_qs(urlsplit(raw["url"]).query).get("id") != [str(activity_id)]
+        ):
+            raise fail(
+                "SUBMISSION_FORMAT_UNSUPPORTED", "No se pudo leer la devolución de la tarea."
+            )
+        zone, zone_source = resolve_timezone(raw.get("timezone"), self._settings.timezone)
+        return parse_feedback(raw, status, zone, zone_source, datetime.now(UTC).astimezone(zone))
 
     # Cliente HTTP con las cookies y el User-Agent del navegador, para que el campus vea la
     # misma sesión al enviar formularios sin JavaScript.

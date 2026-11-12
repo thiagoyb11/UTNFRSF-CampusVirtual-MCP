@@ -36,6 +36,7 @@ Las herramientas disponibles son:
 - **`download_resources(course_id, module_id, urls)`**: descarga de 1 a 10 archivos observados, sin restricción de extensión o MIME del módulo a `downloads/`, valida el transporte y devuelve rutas, tamaños y SHA-256. [Contrato y límites](descargas.md).
 
 - **`get_submission_status(course_id, activity_id)`**: consulta estado y archivos de una tarea.
+- **`get_assignment_feedback(course_id, activity_id)`**: lee nota, fecha, docente, comentarios y archivos devueltos de una tarea. Verificada mediante MCP en siete tareas reales el 9 de noviembre de 2026. [Contrato y límites](entregas.md#devolución-del-docente).
 - **`prepare_submission(course_id, activity_id, files)`**: preparación local sin sesión ni escrituras remotas.
 - **`upload_files(course_id, activity_id, files)`**: carga temporal con comprobación de bytes y recibo privado en memoria.
 - **`submit_assignment(upload_id, finalize, accept_statement)`**: guarda la carga y, si se solicita, completa la confirmación final. Guardar puede entregar directamente en cursos sin borradores. Carga y guardado verificados mediante MCP en el TP 6 real con autorización explícita. [Contrato, límites y estado de verificación](entregas.md).

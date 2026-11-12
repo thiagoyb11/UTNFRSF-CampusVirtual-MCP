@@ -39,7 +39,7 @@ Los tipos y cantidades anteriores corresponden a las páginas inspeccionadas, no
 
 El MCP ya cubre un recorrido útil: iniciar sesión, obtener fechas y recursos, descargar archivos y entregar archivos en una tarea compatible. No conviene asignar un porcentaje global de avance: el campus tiene módulos y configuraciones cuya presencia y permisos todavía no se relevaron.
 
-Hay **diez herramientas registradas**:
+Hay **dieciséis herramientas registradas**:
 
 | Herramienta | Estado actual | Límite relevante |
 | --- | --- | --- |
@@ -55,6 +55,7 @@ Hay **diez herramientas registradas**:
 | `get_forum_discussion` | Implementada y verificada con mensajes anidados. | Adjuntos sin verificar en un caso real. |
 | `download_resources` | Implementada para cualquier tipo; tres PDF de Libros descargados y comprobados. | Selección de 1 a 10 enlaces de un módulo por llamada, mismo origen, sin redirecciones ni sincronización incremental. La prueba real citada es de PDF; otros tipos tienen pruebas locales. |
 | `get_submission_status` | Implementada y verificada en TP 6; `new` sin entrega comprobado el 4 de noviembre de 2026. | Estado de una tarea y archivos; no ofrece un detalle completo de consigna, plazos, restricciones o devolución. |
+| `get_assignment_feedback` | Implementada y verificada mediante MCP en siete tareas reales el 9 de noviembre de 2026 (F29). | Nota, fecha, docente y comentarios; archivos devueltos, anotaciones PDF y rúbricas sin caso real. No distingue una tarea sin calificar de una nota no publicada. |
 | `prepare_submission` | Implementada, exclusivamente local. | No consulta si el campus admite esos archivos; los límites reales se validan durante la carga. |
 | `upload_files` | Implementada y verificada con un TXT sintético de 125 bytes en TP 6. | Solo flujo académico `assign`; rechaza entregas existentes. Recibo temporal de 30 minutos en el mismo proceso. |
 | `submit_assignment` | Guardado y estado `submitted` verificados en TP 6, con bytes comprobados. | Borradores y confirmación adicional se probaron localmente; faltan otras configuraciones reales. |
@@ -70,7 +71,7 @@ La auditoría documental anterior citaba **138 pruebas locales** y **3 integraci
 - `[ ]` indica trabajo pendiente; `[x]`, criterio de cierre satisfecho. Un elemento parcial o por validar permanece pendiente.
 - **Falta:** no existe la capacidad. **Parcial:** existe una base aprovechable. **Validar:** existe implementación y falta evidencia. **Explorar:** primero hay que comprobar disponibilidad, interfaz y permisos.
 - **P0:** confiabilidad de los recorridos actuales. **P1:** siguiente núcleo de uso cotidiano. **P2:** ampliación útil. **P3:** opcional, condicionada a necesidad y disponibilidad.
-- Los IDs `F01`–`F48` son estables. No renumerar al completar elementos. Los nombres de herramientas futuros son propuestas, salvo las diez ya registradas.
+- Los IDs `F01`–`F50` son estables. No renumerar al completar elementos. Los nombres de herramientas futuros son propuestas, salvo las ya registradas.
 - Al implementar una funcionalidad, actualizar su estado, alcance, evidencia y pendientes en el mismo cambio. Marcarla terminada solo cuando cumpla su criterio; distinguir pruebas locales de verificación real.
 - Este archivo mantiene el detalle de pendientes. [roadmap.md](../roadmap.md) mantiene el orden general de trabajo; los contratos específicos viven en sus respectivas guías. Evitar listas contradictorias.
 
@@ -201,8 +202,11 @@ La auditoría documental anterior citaba **138 pruebas locales** y **3 integraci
   - Inspeccionar los reportes enlazados y extraer ítems, valores, escalas y totales visibles para la cuenta.
   - **Cierre:** diferencia sin calificar, nota oculta y cero; conserva escalas y no calcula promedios con ponderaciones desconocidas. La navegación está observada, no su parser.
 
-- [ ] **F29 — Leer devoluciones, rúbricas y archivos corregidos.** **P1 · Parcial.**
+- [ ] **F29 — Leer devoluciones, rúbricas y archivos corregidos.** **P1 · Validar.**
   - Ampliar el detalle de tareas con comentarios del docente, calificación y adjuntos de devolución cuando existan.
+  - **Implementado (9 de noviembre de 2026):** `get_assignment_feedback(course_id, activity_id)` lee el bloque `.feedback` de la tarea ya validada por `get_submission_status`. Devuelve nota original (puntos o escala) y, si es `x / y`, valor y máximo; fecha con zona; docente; comentarios por plugin; archivos devueltos separados de los entregados; filas originales como evidencia y `complete`/`warnings`. Clasifica filas por señales estructurales (perfil `/user/view.php`, clases `summary_assignfeedback_<plugin>`), no por etiquetas traducidas. Ver [entregas](entregas.md#devolución-del-docente).
+  - **Verificado:** mediante MCP en siete tareas reales de cuatro materias: escalas («Aprobado», «Incompleto»), puntos sobre 100, comentarios de uno y varios párrafos, tarea sin comentarios y dos tareas sin devolución (`available=false`). Pruebas locales con fixtures sintéticas. El 11 de noviembre de 2026 se repitió mediante MCP en seis tareas entregadas de Bases de Datos No SQL, todas sin calificar (`available=false`, con sus archivos entregados), y en una tarea con nota sobre 100 de otra materia.
+  - **Pendiente:** archivos devueltos (`assignfeedback_file`), anotaciones PDF (`assignfeedback_editpdf`) y rúbricas o guías no aparecieron en las tareas inspeccionadas; se detectan y se declaran incompletas, pero su extracción no se verificó. Un comentario resumido devuelve `full_view_url` sin seguirlo. Sin devolución visible no se distingue «sin calificar» de «no publicada».
   - **Cierre:** distingue archivos enviados de archivos devueltos y enlaza sus fuentes; las anotaciones de PDF o rúbricas se declaran incompletas si no pueden extraerse.
 
 - [ ] **F30 — Consultar asistencia propia.** **P2 · Explorar.**
@@ -300,11 +304,16 @@ La auditoría documental anterior citaba **138 pruebas locales** y **3 integraci
   - **Pendiente:** comprobar una consulta posterior resuelta con la guía, lectura de avisos y etiquetas (F32, F14) y lectura de documentos en memoria desde el MCP, sin escribir en disco.
   - **Cierre:** una ejecución real genera ambos archivos, declara sus vacíos, no deja documentos temporales y una consulta posterior se resuelve usando la guía.
 
+- [ ] **F50 — Centralizar la traducción de excepciones a errores MCP.** **P1 · Falta.**
+  - Cada módulo de `tools/` repite el mismo par `except (<errores de dominio>) … except Exception …` (12 bloques en 7 archivos). Crear un manejador global único, por ejemplo un decorador o envoltorio aplicado al registrar las herramientas, que traduzca los errores de dominio a `ToolError` y asigne el código interno de cada área sin `if`/`else` por herramienta.
+  - Conservar los mensajes y códigos actuales (`SUBMISSION_INTERNAL_ERROR`, `UPLOAD_LOCAL_FILE_ERROR` y equivalentes), el aviso de verificar el estado antes de repetir escrituras y el ocultamiento de excepciones crudas. Es la base de F47.
+  - **Cierre:** ningún módulo de `tools/` contiene `try`/`except` propio para traducir errores; las pruebas locales cubren un error de dominio, uno de sesión y uno inesperado por área, con los mismos textos que hoy.
+
 ## Orden recomendado
 
 1. **Estabilizar lo ya utilizado:** F41 y las validaciones F12, F13 y F26 (F45 completada el 1 de noviembre de 2026). No bloquea en paralelo las mejoras pequeñas de descubrimiento.
 2. **Completar la consulta académica básica:** F01–F05, F07–F10 y F19. El objetivo es poder preguntar por una materia y sus trabajos sin aportar IDs o interpretar enlaces manualmente.
-3. **Incorporar información cotidiana faltante:** lectura de páginas, calificaciones, devoluciones y avisos (F14, F28, F29 y F32).
+3. **Incorporar información cotidiana faltante:** lectura de páginas, calificaciones, devoluciones y avisos (F14, F28, F29 y F32). Inmediatamente después de F29, centralizar el manejo de excepciones de las herramientas (F50).
 4. **Ampliar materiales y entregas:** búsqueda, lotes, metadatos, edición y reconciliación (F06, F15–F18, F20–F27), según necesidad.
 5. **Evaluar otras áreas:** Timeline, seguimiento, comunicación y módulos opcionales tras inspeccionar sus pantallas y permisos.
 

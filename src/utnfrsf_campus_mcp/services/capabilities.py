@@ -24,6 +24,7 @@ PENDING_FEATURES_DOC = "docs/funcionalidades-pendientes.md"
 _CAMPUS_CHECK_2026_10_31 = date(2026, 10, 31)
 _CAMPUS_CHECK_2026_11_04 = date(2026, 11, 4)
 _CAMPUS_CHECK_2026_11_05 = date(2026, 11, 5)
+_CAMPUS_CHECK_2026_11_09 = date(2026, 11, 9)
 
 
 # Catálogo agrupado por área. Cada entrada declara: herramienta, IDs del inventario de
@@ -173,6 +174,20 @@ CAPABILITIES: tuple[Capability, ...] = (
         pending=[
             "No devuelve consigna completa ni plazos efectivos (F05, F10).",
             "Una tarea vencida no muestra su fecha límite en esta vista.",
+        ],
+        docs="docs/entregas.md",
+    ),
+    Capability(
+        tool="get_assignment_feedback",
+        feature_ids=["F29"],
+        effect="campus_read",
+        status="campus_verified",
+        verified_on=_CAMPUS_CHECK_2026_11_09,
+        scope="Nota (puntos o escala), fecha, docente y comentarios de una tarea assign.",
+        pending=[
+            "Archivos devueltos, anotaciones PDF y rúbricas sin verificar en un caso real.",
+            "Un comentario resumido se informa incompleto; no se sigue su vista completa.",
+            "No distingue una tarea sin calificar de una calificación no publicada.",
         ],
         docs="docs/entregas.md",
     ),

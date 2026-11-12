@@ -18,6 +18,8 @@ Su objetivo es facilitar las tareas cotidianas del estudiante desde un asistente
 
 `get_server_info()` indica qué herramientas están verificadas en el campus, cuáles solo parcialmente y cuáles tienen solo pruebas locales, con sus límites conocidos.
 
+`get_assignment_feedback()` muestra la devolución del docente en una tarea: nota, fecha, quién corrigió, comentarios y archivos devueltos.
+
 `get_submission_status()` consulta una tarea; `prepare_submission()` valida archivos localmente; `upload_files()` los carga a un área temporal; `submit_assignment()` guarda y, opcionalmente, finaliza la entrega. Ver [contrato y verificación](docs/entregas.md). La carga y el guardado se verificaron mediante MCP en el TP 6 de Análisis Numérico, con estado final enviado y comprobación de los bytes.
 
 ## Funciones previstas
@@ -25,7 +27,7 @@ Su objetivo es facilitar las tareas cotidianas del estudiante desde un asistente
 - Consultar materias, actividades y consignas.
 - Revisar fechas de entrega y eventos del calendario.
 - Descargar bibliografía, apuntes y otros materiales.
-- Enviar trabajos prácticos y consultar el estado de las entregas.
+- Enviar trabajos prácticos, consultar el estado de las entregas y leer sus devoluciones.
 
 ## Cómo funciona
 

@@ -105,7 +105,7 @@ La [referencia de herramientas de Lightpanda](https://lightpanda.io/docs/referen
 
 ## 6. Consultar entregas y preparar archivos localmente
 
-**Avance:** `get_submission_status` y `prepare_submission` implementadas y registradas. La preparación no realiza peticiones al campus. Inspección real del TP 6 y límites documentados en [entregas](docs/entregas.md).
+**Avance:** `get_submission_status` y `prepare_submission` implementadas y registradas. La preparación no realiza peticiones al campus. Inspección real del TP 6 y límites documentados en [entregas](docs/entregas.md). `get_assignment_feedback` lee la devolución del docente y se verificó en siete tareas reales el 9 de noviembre de 2026 (F29); faltan casos reales con archivos devueltos, anotaciones PDF y rúbricas.
 
 **Objetivo:** conocer el estado de un TP y construir una preparación verificable sin modificar el campus.
 

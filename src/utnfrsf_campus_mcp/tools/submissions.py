@@ -9,6 +9,7 @@ from pydantic import Field
 
 from utnfrsf_campus_mcp.errors import DownloadError, LoginError, SubmissionError
 from utnfrsf_campus_mcp.models import (
+    AssignmentFeedback,
     PreparedSubmission,
     SubmissionResult,
     SubmissionStatus,
@@ -72,6 +73,18 @@ def register_submissions(server: MCPServer, service: SubmissionService) -> None:
     async def get_submission_status(course_id: Id, activity_id: Id) -> SubmissionStatus:
         """Consulta estado y archivos de una tarea assign, conservando la evidencia original."""
         return await call(service.get_submission_status, course_id, activity_id)
+
+    # Devolución del docente: nota, fecha, docente, comentarios y archivos devueltos.
+    @server.tool(annotations=read)
+    async def get_assignment_feedback(course_id: Id, activity_id: Id) -> AssignmentFeedback:
+        """Consulta la devolución de una tarea assign: nota, fecha, docente y comentarios.
+
+        Devuelve la nota tal como la muestra el campus (puntos o escala) y, si es numérica,
+        su valor y máximo; no calcula promedios. Separa los archivos devueltos por el docente
+        de los entregados. available=false indica que la cuenta no ve devolución, sin
+        distinguir entre una tarea sin calificar y una calificación no publicada.
+        """
+        return await call(service.get_assignment_feedback, course_id, activity_id)
 
     # Paso 2: sube los archivos al área temporal de Moodle y devuelve un recibo (upload_id).
     @server.tool(annotations=write)

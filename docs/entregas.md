@@ -42,6 +42,7 @@ Referencias: [SDK de Lightpanda](https://lightpanda.io/docs/reference/python), [
 | Función | Efecto |
 | --- | --- |
 | `get_submission_status(course_id, activity_id)` | Consulta estado, archivos y evidencia original de una tarea. |
+| `get_assignment_feedback(course_id, activity_id)` | Consulta nota, fecha, docente, comentarios y archivos de la devolución. Solo lectura. |
 | `prepare_submission(course_id, activity_id, files)` | Valida rutas y crea manifiestos con nombre, tamaño y SHA-256. Solo realiza I/O local. |
 | `upload_files(course_id, activity_id, files)` | Carga temporalmente y comprueba bytes; devuelve `upload_id`. No guarda la entrega. |
 | `submit_assignment(upload_id, finalize=False, accept_statement=False)` | Guarda y comprueba la entrega. `finalize=True` completa la confirmación adicional observada; una declaración requiere aceptación explícita. |
@@ -84,13 +85,40 @@ La prueba se ejecutó mediante las herramientas MCP el 31 de octubre de 2026, co
 
 La pausa pertenece a esta comprobación; no se afirma que 90 segundos resuelvan cualquier límite ni se incorporó un reenvío automático de escrituras. No se hicieron commits. Borradores y confirmaciones adicionales se verificaron en fixtures, no en esta tarea real.
 
+## Devolución del docente
+
+`get_assignment_feedback(course_id, activity_id)` abre la tarea con las mismas validaciones de sesión, materia y actividad que `get_submission_status` y lee el bloque de devolución de esa página. Es de solo lectura.
+
+### Estructura observada
+
+Inspeccionada el 9 de noviembre de 2026, en solo lectura, en siete tareas de cuatro materias. La interfaz de la cuenta estaba en inglés:
+
+- `div.feedback` > `h3` y `div.feedbacktable` > `table.generaltable`. Cada fila tiene un `th` con la etiqueta traducida y un `td` con el valor; las filas no tienen clases propias, salvo `lastrow`.
+- Orden del renderer: nota (si existe), fecha de calificación, docente y una fila por plugin de devolución.
+- La fila del docente enlaza su perfil `/user/view.php` e incluye avatar o iniciales.
+- La fila de comentarios contiene `div.plugincontentsummary.summary_assignfeedback_comments_<id>` con párrafos.
+- Sin devolución publicada para la cuenta, el bloque `div.feedback` no existe.
+
+### Contrato
+
+- Las filas se clasifican sin leer etiquetas: perfil del docente, clases `summary_assignfeedback_<plugin>` y, para las anteriores, el orden nota/fecha. Si ese orden no puede confirmarse, la respuesta se marca `complete=false`.
+- `grade` conserva el texto del campus («Aprobado», «88.00 / 100.00»). `grade_value` y `grade_max` solo se completan para `x / y`; no se calculan porcentajes ni promedios.
+- `graded_at` se interpreta con la zona del perfil del campus (`timezone_source=campus`) o, si falta, con la configurada, y se avisa. Si la fecha no se reconoce, se devuelve solo `graded_at_text`.
+- `comments` reúne el texto del plugin `comments` con sus saltos de párrafo. `feedback_files` incluye solo enlaces `/pluginfile.php/.../assignfeedback_*` del campus sin secretos; `submission_files` son los archivos entregados por la cuenta.
+- Un comentario resumido con enlace `action=viewpluginassignfeedback`, una rúbrica o guía (`gradingform_*`), filas extra o archivos fuera de un plugin generan `complete=false` y un aviso. Los enlaces externos de un comentario quedan en el texto y no se siguen.
+- `available=false` indica que no hay bloque de devolución visible. No distingue una tarea sin calificar de una nota oculta o no publicada.
+
+### Verificación real
+
+Se verificó mediante MCP el 9 de noviembre de 2026 en siete tareas: dos con escala y comentarios, una de ellas con varios párrafos; dos con puntos sobre 100 y comentarios; una con puntos sin comentarios; y dos sin devolución, que devolvieron `available=false`. Las fechas se interpretaron con la zona del campus. No hubo casos reales con archivos devueltos, anotaciones PDF ni rúbricas: esas variantes solo tienen pruebas locales.
+
 ## Código y controles locales
 
 - `parsers/submissions.py`: preparación, formularios, configuración, restricciones y enlaces del draft.
-- `browser/submissions.py`: estado y acciones de la tarea.
+- `browser/submissions.py`: estado, acciones y bloque de devolución de la tarea.
 - `browser/uploads.py`: HTTP autenticado, multipart, helper y comprobación de bytes.
 - `browser/file_input.py`: puente de archivos a las APIs del navegador y descubrimiento del cliente AJAX.
 - `services/submissions.py`: carga, recibos, guardado y reconciliación.
-- `tools/submissions.py`: registro de las cuatro herramientas.
+- `tools/submissions.py`: registro de las cinco herramientas.
 
 Se ejecutaron **138 pruebas aprobadas**; 13 integraciones optativas omitidas por defecto. Las **tres** pruebas optativas de transporte con Lightpanda contra un servidor sintético aprobaron por separado. Se comprobaron tipos variados, carpetas rechazadas, restricciones, cambios concurrentes, recibos vencidos, borradores, guardado que envía directamente, declaración explícita y respuestas perdidas sin duplicar POSTs. Ruff verificó lint y formato. Los tests permanecen locales e ignorados según la preferencia del proyecto.

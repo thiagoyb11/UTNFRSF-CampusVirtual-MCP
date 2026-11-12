@@ -320,6 +320,50 @@ class SubmissionStatus(BaseModel):
     evidence: list[str]
 
 
+class FeedbackRow(BaseModel):
+    """Fila original del bloque de devolución: etiqueta y texto tal como los muestra el campus."""
+
+    label: str
+    text: str
+
+
+class FeedbackPlugin(BaseModel):
+    """Contenido de un plugin de devolución (por ejemplo, comments) de la tarea."""
+
+    plugin: str
+    label: str
+    text: str
+    files: list[SubmissionFile]
+    complete: bool
+    full_view_url: str | None = None
+
+
+class AssignmentFeedback(BaseModel):
+    """Devolución visible para la cuenta en una tarea assign; no calcula promedios."""
+
+    course_id: int
+    activity_id: int
+    name: str
+    source_url: str
+    fetched_at: AwareDatetime
+    available: bool
+    grade: str | None
+    grade_value: float | None
+    grade_max: float | None
+    graded_at: AwareDatetime | None
+    graded_at_text: str | None
+    timezone: str
+    timezone_source: Literal["campus", "configuration"]
+    grader: str | None
+    comments: str | None
+    plugins: list[FeedbackPlugin]
+    feedback_files: list[SubmissionFile]
+    submission_files: list[SubmissionFile]
+    complete: bool
+    warnings: list[str]
+    evidence: list[FeedbackRow]
+
+
 class UploadLimits(BaseModel):
     max_files: int
     max_file_bytes: int

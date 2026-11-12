@@ -7,14 +7,27 @@ import re
 import stat
 import unicodedata
 from dataclasses import dataclass, field
+from datetime import datetime
 from html.parser import HTMLParser
 from pathlib import Path
+from typing import Any
 from urllib.parse import parse_qs, urljoin, urlsplit
+from zoneinfo import ZoneInfo
 
 from utnfrsf_campus_mcp.config import CAMPUS_BASE_URL
 from utnfrsf_campus_mcp.errors import SubmissionError
-from utnfrsf_campus_mcp.models import LocalSubmissionFile, PreparedSubmission, UploadLimits
+from utnfrsf_campus_mcp.models import (
+    AssignmentFeedback,
+    FeedbackPlugin,
+    FeedbackRow,
+    LocalSubmissionFile,
+    PreparedSubmission,
+    SubmissionFile,
+    SubmissionStatus,
+    UploadLimits,
+)
 from utnfrsf_campus_mcp.parsers.login import same_origin
+from utnfrsf_campus_mcp.parsers.resources import clean_link
 
 # Límite local por archivo y clases CSS con las que Moodle marca el estado de la entrega
 # y de la calificación (independientes del idioma de la interfaz).
@@ -348,3 +361,230 @@ def find_link(document: CampusHTML, path: str, action: str) -> str:
             "UPLOAD_FORM_UNSUPPORTED", "No se encontró un único enlace del selector de archivos."
         )
     return matches[0]
+
+
+# --- Devolución del docente (F29) ---------------------------------------------------------
+
+# Fechas de la fila "Calificado el" en la interfaz inglesa observada ("Thursday, 5 November
+# 2026, 4:06 PM") y en su equivalente español ("jueves, 5 de noviembre de 2026, 16:06").
+_MONTHS = {
+    name: number
+    for number, names in enumerate(
+        (
+            ("january", "enero"),
+            ("february", "febrero"),
+            ("march", "marzo"),
+            ("april", "abril"),
+            ("may", "mayo"),
+            ("june", "junio"),
+            ("july", "julio"),
+            ("august", "agosto"),
+            ("september", "septiembre", "setiembre"),
+            ("october", "octubre"),
+            ("november", "noviembre"),
+            ("december", "diciembre"),
+        ),
+        start=1,
+    )
+    for name in names
+}
+_FEEDBACK_DATE = re.compile(
+    r"(\d{1,2})\s+(?:de\s+)?([^\W\d_]+)\s+(?:de\s+)?(\d{4}),?\s+(\d{1,2}):(\d{2})"
+    r"(?:\s*([ap])\.?\s?m\.?)?",
+    re.IGNORECASE,
+)
+_POINTS_GRADE = re.compile(r"^\s*(-?\d+(?:[.,]\d+)?)\s*/\s*(\d+(?:[.,]\d+)?)\s*$")
+
+
+def parse_feedback_date(text: str, zone: ZoneInfo) -> datetime | None:
+    """Convierte la fecha mostrada a un instante con zona; None si no se reconoce."""
+    match = _FEEDBACK_DATE.search(text or "")
+    if not match:
+        return None
+    day, month_name, year, hour, minute, meridiem = match.groups()
+    month = _MONTHS.get(month_name.casefold())
+    hour = int(hour)
+    if month is None or hour > 23 or (meridiem and not 1 <= hour <= 12):
+        return None
+    if meridiem:
+        hour = hour % 12 + (12 if meridiem.lower() == "p" else 0)
+    try:
+        return datetime(int(year), month, int(day), hour, int(minute), tzinfo=zone)
+    except ValueError:
+        return None
+
+
+# Nota numérica "88.00 / 100.00"; las escalas ("Aprobado") se conservan solo como texto.
+def parse_points_grade(text: str) -> tuple[float | None, float | None]:
+    match = _POINTS_GRADE.match(text or "")
+    if not match:
+        return None, None
+    value, maximum = (float(part.replace(",", ".")) for part in match.groups())
+    return value, maximum
+
+
+# Enlaces de una celda que pertenecen al campus y no llevan secretos. Los enlaces externos
+# que el docente escriba en un comentario quedan en el texto, pero no se interpretan.
+def _campus_links(row: dict) -> list[tuple[str, str]]:
+    result = []
+    for link in row.get("links") or []:
+        url = link.get("url") if isinstance(link, dict) else None
+        if same_origin(url or "", CAMPUS_BASE_URL) and clean_link(url, CAMPUS_BASE_URL) == url:
+            result.append((url, str(link.get("name") or "")))
+    return result
+
+
+def _is_feedback_file(url: str) -> bool:
+    path = urlsplit(url).path
+    return path.startswith("/pluginfile.php/") and "/assignfeedback_" in path
+
+
+def _is_full_view(url: str) -> bool:
+    parts = urlsplit(url)
+    return parts.path == "/mod/assign/view.php" and parse_qs(parts.query).get("action") == [
+        "viewpluginassignfeedback"
+    ]
+
+
+def parse_feedback(
+    raw: Any,
+    status: SubmissionStatus,
+    zone: ZoneInfo,
+    zone_source: str,
+    fetched_at: datetime,
+) -> AssignmentFeedback:
+    """Interpreta el bloque de devolución sin depender de etiquetas traducidas.
+
+    Las filas se clasifican por señales estructurales: enlace al perfil del docente y
+    clases summary_assignfeedback_<plugin>. Las filas previas sin esas señales son, en
+    el orden del renderer de Moodle, la nota (si existe) y la fecha de calificación.
+    """
+    if not isinstance(raw, dict) or not isinstance(raw.get("rows"), list):
+        raise fail("SUBMISSION_FORMAT_UNSUPPORTED", "No se pudo leer el bloque de devolución.")
+    base = {
+        "course_id": status.course_id,
+        "activity_id": status.activity_id,
+        "name": status.name,
+        "source_url": status.source_url,
+        "fetched_at": fetched_at,
+        "timezone": zone.key,
+        "timezone_source": zone_source,
+        "submission_files": status.files,
+    }
+    if not raw.get("present"):
+        return AssignmentFeedback(
+            **base,
+            available=False,
+            grade=None,
+            grade_value=None,
+            grade_max=None,
+            graded_at=None,
+            graded_at_text=None,
+            grader=None,
+            comments=None,
+            plugins=[],
+            feedback_files=[],
+            complete=True,
+            warnings=[
+                "La tarea no muestra devolución para esta cuenta: puede no estar calificada "
+                "o la calificación todavía no se publicó."
+            ],
+            evidence=[],
+        )
+    rows = raw["rows"]
+    if not rows or not all(isinstance(r, dict) for r in rows):
+        raise fail(
+            "SUBMISSION_FORMAT_UNSUPPORTED", "El bloque de devolución no tiene filas reconocibles."
+        )
+
+    warnings: list[str] = []
+    complete = True
+    leading: list[dict] = []
+    graders: list[dict] = []
+    plugins: list[FeedbackPlugin] = []
+    feedback_files: list[SubmissionFile] = []
+    for row in rows:
+        label, text = str(row.get("label") or ""), str(row.get("text") or "")
+        links = _campus_links(row)
+        if row.get("rubric"):
+            complete = False
+            warnings.append(f"La fila «{label}» incluye una rúbrica o guía que no se extrajo.")
+        if row.get("plugins"):
+            files = [
+                SubmissionFile(name=name or urlsplit(url).path.rsplit("/", 1)[-1], url=url)
+                for url, name in links
+                if _is_feedback_file(url)
+            ]
+            full_view = next((url for url, _ in links if _is_full_view(url)), None)
+            if full_view:
+                complete = False
+                warnings.append(
+                    f"«{label}» muestra un resumen; el texto completo está en full_view_url."
+                )
+            plugins.append(
+                FeedbackPlugin(
+                    plugin=str(row["plugins"][0]),
+                    label=label,
+                    text=text,
+                    files=files,
+                    complete=full_view is None,
+                    full_view_url=full_view,
+                )
+            )
+            feedback_files.extend(files)
+            continue
+        if any(_is_feedback_file(url) for url, _ in links):
+            complete = False
+            warnings.append(f"La fila «{label}» tiene archivos fuera de un plugin reconocido.")
+        if row.get("grader"):
+            graders.append(row)
+        elif not plugins and not graders:
+            leading.append(row)
+        else:
+            complete = False
+            warnings.append(f"Fila de devolución no reconocida: «{label}»; ver evidence.")
+
+    grade = graded_at_text = None
+    if len(leading) == 2:
+        grade, graded_at_text = (str(r.get("text") or "") for r in leading)
+    elif len(leading) == 1:
+        only = str(leading[0].get("text") or "")
+        if parse_feedback_date(only, zone) is not None:
+            graded_at_text = only
+        else:
+            complete = False
+            warnings.append("No se pudo determinar si la primera fila es la nota o la fecha.")
+    elif leading:
+        complete = False
+        warnings.append("El bloque tiene más filas de calificación que las observadas.")
+
+    graded_at = parse_feedback_date(graded_at_text, zone) if graded_at_text else None
+    if graded_at_text and graded_at is None:
+        warnings.append("La fecha de calificación se devuelve solo como texto original.")
+    elif graded_at is not None and zone_source == "configuration":
+        warnings.append("La fecha se interpretó con la zona configurada; el campus no la informó.")
+    if len(graders) > 1:
+        complete = False
+        warnings.append("Hay más de un docente indicado; se devuelve el primero.")
+
+    grade_value, grade_max = parse_points_grade(grade) if grade else (None, None)
+    comments = [p.text for p in plugins if p.plugin == "comments" and p.text]
+    return AssignmentFeedback(
+        **base,
+        available=True,
+        grade=grade or None,
+        grade_value=grade_value,
+        grade_max=grade_max,
+        graded_at=graded_at,
+        graded_at_text=graded_at_text or None,
+        grader=(str(graders[0].get("text") or "") or None) if graders else None,
+        comments="\n\n".join(comments) or None,
+        plugins=plugins,
+        feedback_files=feedback_files,
+        complete=complete,
+        warnings=warnings,
+        evidence=[
+            FeedbackRow(label=str(r.get("label") or ""), text=str(r.get("text") or ""))
+            for r in rows
+        ],
+    )
