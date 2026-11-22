@@ -139,11 +139,13 @@ La [referencia de herramientas de Lightpanda](https://lightpanda.io/docs/referen
 
 **Avance:** `get_server_info` publica el estado real de cada herramienta registrada desde un catálogo verificado por pruebas locales (F45, 1 de noviembre de 2026). Ver [estado de las capacidades](docs/desarrollo.md#estado-de-las-capacidades).
 
-1. Agregar CI para pruebas unitarias, lint y formato sin cuentas del campus. Mantener las integraciones reales como optativas y sin secretos en logs.
-2. Completar ejemplos de configuración de hosts MCP con las herramientas disponibles y los pasos reales de autenticación.
-3. Documentar versiones y plataformas probadas, limitaciones del campus, recuperación de sesión y errores conocidos.
-4. Revisar el cierre y la cancelación de operaciones, tiempos máximos, concurrencia y la exclusión de datos privados de Git.
-5. Hacer una prueba de instalación limpia y un recorrido autorizado de las funciones soportadas. Actualizar el README de manera breve, manteniendo el detalle técnico en esta documentación.
+**Avance (18 de noviembre de 2026), versión 0.2.0 sin publicar:** CI de lint, formato e instalación desde `uv.lock` con `scripts/smoke_mcp.py` (todavía sin primera ejecución en GitHub); plataformas documentadas (Windows no soportado por Lightpanda); README orientado a la instalación; [CHANGELOG](CHANGELOG.md) con política de compatibilidad; errores centralizados (F50) y pausa compartida ante HTTP 429 (F41).
+
+1. [x] Agregar CI sin cuentas del campus. Cubre lint, formato y un smoke test del paquete instalado; las pruebas unitarias de `tests/` siguen siendo locales por preferencia del proyecto (F46).
+2. [x] Completar ejemplos de configuración de hosts MCP con las herramientas disponibles y los pasos reales de autenticación (README y `examples/mcp.json`).
+3. [ ] Documentar versiones y plataformas probadas, limitaciones del campus, recuperación de sesión y errores conocidos. Plataformas y limitaciones ya están documentadas; falta un catálogo de códigos de error y recuperación (F47).
+4. [ ] Revisar el cierre y la cancelación de operaciones, tiempos máximos, concurrencia y la exclusión de datos privados de Git (F44).
+5. [ ] Hacer una prueba de instalación limpia y un recorrido autorizado de las funciones soportadas. La instalación limpia pasó en macOS; faltan el CI en Linux, una instalación hecha por otra persona y el recorrido real con la versión 0.2.0.
 
 **Criterio de cierre:** otra persona puede instalar el proyecto con el lockfile y utilizar las capacidades publicadas siguiendo instrucciones comprobadas.
 

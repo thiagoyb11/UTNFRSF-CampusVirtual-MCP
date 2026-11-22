@@ -3,13 +3,12 @@
 from typing import Annotated
 
 from mcp.server import MCPServer
-from mcp.server.mcpserver.exceptions import ToolError
 from mcp.types import ToolAnnotations
 from pydantic import Field
 
-from utnfrsf_campus_mcp.errors import CalendarError, LoginError
 from utnfrsf_campus_mcp.models import MonthlyActivities
 from utnfrsf_campus_mcp.services.calendar import CalendarService
+from utnfrsf_campus_mcp.tools.errors import tool_errors
 
 
 def register_calendar(server: MCPServer, service: CalendarService) -> None:
@@ -22,6 +21,7 @@ def register_calendar(server: MCPServer, service: CalendarService) -> None:
             open_world_hint=True,
         )
     )
+    @tool_errors("calendar")
     async def list_monthly_activities(
         year: Annotated[
             int | None, Field(ge=1970, le=9998, description="Año; junto con month.")
@@ -39,13 +39,4 @@ def register_calendar(server: MCPServer, service: CalendarService) -> None:
         No confirma entregas pendientes. Autentica con .env y consulta solo eventos visibles
         para la cuenta y sus filtros de calendario. No depende del idioma de la interfaz.
         """
-        # La validación de rangos ya la hizo pydantic; el servicio exige year y month juntos.
-        # Los errores conocidos se reenvían con su código; el resto se oculta tras uno genérico.
-        try:
-            return await service.list_monthly_activities(year, month, deadlines_only)
-        except (CalendarError, LoginError) as exc:
-            raise ToolError(str(exc)) from None
-        except Exception:
-            raise ToolError(
-                "CALENDAR_INTERNAL_ERROR: No se pudo completar la consulta mensual."
-            ) from None
+        return await service.list_monthly_activities(year, month, deadlines_only)

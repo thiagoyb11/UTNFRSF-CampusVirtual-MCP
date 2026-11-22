@@ -18,6 +18,7 @@ from urllib.error import HTTPError, URLError
 from urllib.parse import unquote, urlsplit
 from urllib.request import HTTPCookieProcessor, HTTPRedirectHandler, Request, build_opener
 
+from utnfrsf_campus_mcp.browser.rate_limit import parse_retry_after
 from utnfrsf_campus_mcp.config import CAMPUS_BASE_URL
 from utnfrsf_campus_mcp.errors import DownloadError
 from utnfrsf_campus_mcp.models import DownloadedFile
@@ -287,8 +288,9 @@ def download_file(url: str, jar: CookieJar, destination: Path) -> DownloadedFile
             code, message = "DOWNLOAD_RATE_LIMITED", "El campus limitó las solicitudes."
         else:
             code, message = "DOWNLOAD_HTTP_ERROR", "No se pudo descargar el archivo."
+        retry_after = parse_retry_after(exc.headers.get("Retry-After")) if exc.code == 429 else None
         exc.close()
-        raise DownloadError(code, message) from None
+        raise DownloadError(code, message, retry_after) from None
     except HTTPException:
         raise DownloadError(
             "DOWNLOAD_INCOMPLETE", "La respuesta de descarga se interrumpió."

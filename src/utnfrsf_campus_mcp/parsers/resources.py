@@ -41,6 +41,11 @@ _SECRET = re.compile(r"sesskey|token|password|secret|authorization|signature|api
 _MODULE_PATH = re.compile(r"/mod/([a-z][a-z0-9_]*)/view\.php\Z")
 # Módulos cuyos archivos de pluginfile.php se listan en la propia página del módulo.
 _MODULE_FILE_PATH = re.compile(r"/pluginfile\.php/[0-9]+/mod_(resource|folder|assign|page)/")
+# Archivos de una tarea que no figuran en la página del módulo sino en su estado de entrega:
+# los que devuelve el docente (assignfeedback_<plugin>, como el PDF anotado) y los entregados.
+_ASSIGN_FILE_PATH = re.compile(
+    r"/pluginfile\.php/[0-9]+/(assignfeedback_[a-z0-9]+|assignsubmission_file)/"
+)
 
 
 # Error genérico cuando la página no tiene la estructura esperada de Moodle.
@@ -109,6 +114,11 @@ def file_module_type(url: str) -> str | None:
         return None
     match = _MODULE_FILE_PATH.match(urlsplit(url).path)
     return match[1] if match else None
+
+
+def is_assignment_file(url: str) -> bool:
+    """Archivo devuelto por el docente o entregado en una tarea, según su ruta."""
+    return same_origin(url, CAMPUS_BASE_URL) and bool(_ASSIGN_FILE_PATH.match(urlsplit(url).path))
 
 
 # Si el enlace lleva a una sección de esta misma materia, devuelve (índice, URL canónica).

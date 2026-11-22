@@ -1,12 +1,11 @@
 """Herramienta login sin parámetros de credenciales visibles para el modelo."""
 
 from mcp.server import MCPServer
-from mcp.server.mcpserver.exceptions import ToolError
 from mcp.types import ToolAnnotations
 
-from utnfrsf_campus_mcp.errors import LoginError
 from utnfrsf_campus_mcp.models import LoginResult
 from utnfrsf_campus_mcp.services.authentication import AuthenticationService
+from utnfrsf_campus_mcp.tools.errors import tool_errors
 
 
 def register_authentication(server: MCPServer, service: AuthenticationService) -> None:
@@ -19,6 +18,7 @@ def register_authentication(server: MCPServer, service: AuthenticationService) -
             open_world_hint=True,
         )
     )
+    @tool_errors("login")
     async def login() -> LoginResult:
         """Inicia sesión en UTN FRSF con las credenciales locales de .env.
 
@@ -26,12 +26,4 @@ def register_authentication(server: MCPServer, service: AuthenticationService) -
         inactivo. Reintenta TooManyRequests de forma acotada, volviendo a la página
         de acceso.
         """
-        # Los errores de dominio ya traen un código y un mensaje seguros: se reenvían tal cual.
-        try:
-            return await service.login()
-        except LoginError as exc:
-            raise ToolError(str(exc)) from None
-        except Exception:
-            # No enviar al modelo mensajes del navegador que puedan contener
-            # valores de formularios, URLs con tokens o credenciales.
-            raise ToolError("LOGIN_INTERNAL_ERROR: No se pudo completar el acceso.") from None
+        return await service.login()

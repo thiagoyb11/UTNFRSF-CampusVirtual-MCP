@@ -1,0 +1,51 @@
+# Controles sin cuenta del campus: lint, formato, instalación limpia y protocolo MCP.
+# Las pruebas de tests/ son locales por preferencia del proyecto y no se ejecutan acá.
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  lint:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+      # Misma versión que fija uv.lock.
+      - run: python -m pip install ruff==0.17.3
+      - run: ruff check .
+      - run: ruff format --check .
+
+  install:
+    # Lightpanda 1.0.2 publica binarios para Linux (glibc >= 2.35) y macOS; no para Windows.
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-24.04, macos-14]
+        python: ["3.11", "3.13"]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python }}
+      # Instalación no editable con las versiones exactas del lockfile.
+      - name: Instalar con el lockfile
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install uv
+          uv export --frozen --no-dev --no-emit-project --no-hashes -o requirements.lock
+          python -m pip install -r requirements.lock
+          python -m pip install --no-deps .
+      - run: python -m utnfrsf_campus_mcp --version
+      # Fuera del repositorio, para usar el paquete instalado y no el código fuente.
+      - name: Protocolo MCP y Lightpanda sin red
+        working-directory: ${{ runner.temp }}
+        run: python "$GITHUB_WORKSPACE/scripts/smoke_mcp.py" --with-lightpanda

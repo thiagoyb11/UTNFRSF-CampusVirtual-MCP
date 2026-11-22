@@ -10,9 +10,35 @@ Desde la raíz del repositorio, la instalación para este macOS con Homebrew es:
 /opt/homebrew/bin/python3 -m pip install --user --break-system-packages -e . --group dev
 ```
 
-Los paquetes quedan disponibles para el intérprete global en la instalación del usuario. `--group dev` incorpora las herramientas de desarrollo; se puede omitir para instalar solo el MCP. En otros sistemas, usá el ejecutable global compatible y las opciones de pip correspondientes.
+Los paquetes quedan disponibles para el intérprete global en la instalación del usuario. `--group dev` incorpora las herramientas de desarrollo; se puede omitir para instalar solo el MCP.
 
 Lightpanda incluye su navegador en el paquete de Python. No hace falta instalar Chromium ni levantar un servidor CDP separado. Ver la [guía del SDK de Python](https://lightpanda.io/docs/guides/use-python).
+
+### Plataformas
+
+| Plataforma | Estado |
+| --- | --- |
+| macOS 14+ arm64 (Apple Silicon) | Uso diario y verificación real contra el campus. |
+| macOS 13+ x86_64 | Lightpanda publica binario; sin prueba propia. |
+| Linux x86_64 y aarch64, glibc 2.35 o superior (Ubuntu 22.04+, Debian 12+) | Lightpanda publica binario; el CI instala y ejecuta el smoke test en Ubuntu 24.04. |
+| Windows | **No soportado**: Lightpanda 1.0.2 no publica binario para Windows. Usá WSL 2 con una distribución Linux compatible. |
+
+El CI comprueba Python 3.11 y 3.13. El desarrollo diario usa el Python de Homebrew (3.15).
+
+### Instalación con versiones exactas
+
+Para reproducir exactamente las versiones de `uv.lock`, sin entorno virtual:
+
+```bash
+uv export --frozen --no-dev --no-emit-project --no-hashes -o requirements.lock
+python3 -m pip install --user -r requirements.lock
+python3 -m pip install --user --no-deps .
+python3 scripts/smoke_mcp.py --with-lightpanda
+```
+
+`uv export` solo lee el lockfile: no crea `.venv`. En un Python administrado por el sistema o por Homebrew, pip puede exigir `--break-system-packages` para instalar en el usuario. `requirements.lock` es un archivo generado; no hace falta versionarlo.
+
+La última línea comprueba el paquete instalado sin cuenta del campus ni red externa: arranca el MCP por stdio, verifica que `get_server_info` documente exactamente las herramientas registradas, que una consulta sin credenciales falle con `LOGIN_CREDENTIALS_MISSING` y, con `--with-lightpanda`, que el navegador ejecute JavaScript sobre una página servida en `127.0.0.1`.
 
 ## Ejecutar el MCP
 
@@ -80,7 +106,21 @@ No sobrescribas un `.env` existente ni guardes las credenciales en archivos vers
 | `UTN_CAMPUS_LOGIN_MAX_ATTEMPTS` | `3` | Total máximo de intentos; solo se repite ante límites de solicitudes. |
 | `UTN_CAMPUS_LOGIN_RETRY_DELAY_SECONDS` | `2` | Espera inicial, con crecimiento exponencial y variación aleatoria. |
 | `UTN_CAMPUS_LOGIN_TIMEOUT_SECONDS` | `90` | Presupuesto total del login, incluidas las esperas. |
+| `UTN_CAMPUS_RATE_LIMIT_COOLDOWN_SECONDS` | `30` | Pausa compartida tras un HTTP 429 cuando el campus no envía `Retry-After` (0 a 600). |
+| `UTN_CAMPUS_RATE_LIMIT_MAX_WAIT_SECONDS` | `10` | Cuánto puede esperar una operación nueva durante esa pausa antes de fallar con `CAMPUS_RATE_LIMITED` (0 a 120). |
 | `UTN_CAMPUS_LIGHTPANDA_BINARY` | Sin valor | Ruta opcional a otro binario compatible. |
+
+## Límite de solicitudes compartido
+
+Cualquier herramienta que reciba un límite de solicitudes del campus (códigos `*_RATE_LIMITED`: login, calendario, recursos, descargas o entregas) activa una pausa común en `CampusSession`. Dura lo que indique `Retry-After` en segundos, con un tope de 600, o `UTN_CAMPUS_RATE_LIMIT_COOLDOWN_SECONDS` si el campus no lo envía.
+
+Mientras dura, la próxima operación de cualquier herramienta espera si faltan como máximo `UTN_CAMPUS_RATE_LIMIT_MAX_WAIT_SECONDS`. Si falta más, falla de inmediato con `CAMPUS_RATE_LIMITED` y los segundos restantes, sin enviar ninguna solicitud ni abrir el navegador. La pausa nunca repite una operación: solo decide si la siguiente puede empezar. Las escrituras con resultado incierto siguen sin reintentarse, y una espera exitosa en el pasado no garantiza que el mismo tiempo alcance la próxima vez.
+
+Los reintentos propios del login y la relectura acotada de formularios de entrega se mantienen: actúan dentro de una misma operación y antes de la pausa compartida. Está implementado en `browser/rate_limit.py`.
+
+## Errores de las herramientas
+
+Las herramientas no traducen errores por su cuenta. `tools/errors.py` aplica el decorador `tool_errors(área)` a cada una. Los errores de dominio (subclases de `CampusError`) se reenvían con su código y mensaje seguro. Cualquier otro fallo se reemplaza por el mensaje genérico del área, como `RESOURCES_INTERNAL_ERROR` o `SUBMISSION_INTERNAL_ERROR`, y solo se registra su tipo en stderr. El área de entregas recuerda consultar el estado antes de repetir una escritura. Para agregar una herramienta, decorala con un área existente o agregá el mensaje en `INTERNAL_ERRORS`.
 
 ## Probar en Inspector
 
@@ -129,7 +169,8 @@ Tras actualizar el código, reiniciá la conexión o el proceso MCP del host par
 - `parsers/calendar.py` y `services/calendar.py`: validación del mes, fechas, enlaces y consulta mensual.
 - `browser/resources.py`, `parsers/resources.py` y `services/resources.py`: inventario de enlaces por asignatura y ampliación de páginas de recursos.
 - `parsers/submissions.py`, `browser/uploads.py`, `browser/file_input.py` y `services/submissions.py`: preparación, carga temporal y entrega de tareas.
-- `tools/`: adaptación de los servicios a MCP, sin parámetros de credenciales.
+- `browser/rate_limit.py`: pausa compartida ante HTTP 429 (F41).
+- `tools/`: adaptación de los servicios a MCP, sin parámetros de credenciales. `tools/errors.py` traduce todas las excepciones a errores MCP (F50).
 
 ## Controles locales
 
@@ -151,6 +192,18 @@ Los controles de código se pueden ejecutar directamente:
 ```bash
 /opt/homebrew/bin/python3 -m ruff check .
 /opt/homebrew/bin/python3 -m ruff format --check .
+/opt/homebrew/bin/python3 scripts/smoke_mcp.py --with-lightpanda
 ```
+
+Ruff respeta `.gitignore`, así que `ruff check .` no revisa `tests/`. Pasarle esa carpeta en forma explícita la incluye y puede reformatear tests locales.
+
+## Integración continua
+
+`.github/workflows/ci.yml` corre en cada push a `main` y en cada pull request, sin secretos ni cuenta del campus:
+
+- **lint**: `ruff check .` y `ruff format --check .`, con la versión de ruff de `uv.lock`;
+- **install**: Ubuntu 24.04 y macOS 14, Python 3.11 y 3.13; instala con las versiones exactas del lockfile (sección anterior), comprueba `--version` y ejecuta `scripts/smoke_mcp.py --with-lightpanda` fuera del repositorio.
+
+Los tests de `tests/` son locales por preferencia del proyecto y no corren en CI. Las comprobaciones contra el campus real siguen siendo manuales y optativas.
 
 `pyproject.toml` declara las dependencias y `uv.lock` conserva su resolución. Se puede actualizar el lockfile con `uv lock --python /opt/homebrew/bin/python3`; este comando no crea un entorno virtual. No uses `uv sync` ni `uv run` en este proyecto.

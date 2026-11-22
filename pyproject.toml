@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "utnfrsf-campusvirtual-mcp"
-version = "0.1.0"
+version = "0.2.0"
 description = "Servidor MCP para el Campus Virtual de la UTN FRSF, basado en Lightpanda."
 readme = "README.md"
 requires-python = ">=3.11"

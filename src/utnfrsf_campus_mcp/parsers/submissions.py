@@ -37,8 +37,8 @@ GRADING_STATE_CLASS = re.compile(r"\bsubmission(?:not)?graded\b")
 
 
 # Atajo para construir errores de entrega.
-def fail(code: str, message: str) -> SubmissionError:
-    return SubmissionError(code, message)
+def fail(code: str, message: str, retry_after: float | None = None) -> SubmissionError:
+    return SubmissionError(code, message, retry_after)
 
 
 # Lista blanca de destinos: la URL debe ser del campus y tener una de las rutas permitidas.

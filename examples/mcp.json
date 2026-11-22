@@ -1,7 +1,7 @@
 {
   "mcpServers": {
     "utnfrsf-campus": {
-      "command": "/opt/homebrew/bin/python3",
+      "command": "python3",
       "cwd": "/ruta/absoluta/UTNFRSF-CampusVirtual-MCP",
       "args": [
         "-m",

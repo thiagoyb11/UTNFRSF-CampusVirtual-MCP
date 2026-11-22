@@ -10,6 +10,8 @@ from anyio import CancelScope, Lock
 from lightpanda import AsyncSession, LightpandaError
 
 from utnfrsf_campus_mcp.browser.lightpanda import LightpandaBrowser
+from utnfrsf_campus_mcp.browser.rate_limit import RateLimitGate, is_rate_limit_code
+from utnfrsf_campus_mcp.errors import CampusError
 
 logger = logging.getLogger(__name__)
 # Fallos que indican un navegador caído o inaccesible (proceso muerto, socket cerrado).
@@ -24,7 +26,12 @@ class CampusSession:
     que dependen de la misma sesión, como una carga temporal pendiente de guardar.
     """
 
-    def __init__(self, browser: LightpandaBrowser, idle_seconds: float = 60) -> None:
+    def __init__(
+        self,
+        browser: LightpandaBrowser,
+        idle_seconds: float = 60,
+        rate_limit: RateLimitGate | None = None,
+    ) -> None:
         # _stack guarda el contexto abierto del navegador para poder cerrarlo después.
         # _holds: retenciones activas (clave → instante de vencimiento).
         # _watcher: tarea en segundo plano que cierra el navegador por inactividad.
@@ -36,9 +43,13 @@ class CampusSession:
         self._last_used = 0.0
         self._holds: dict[str, float] = {}
         self._watcher: asyncio.Task[None] | None = None
+        # Freno compartido ante HTTP 429 (F41): lo alimenta cualquier operación y frena a todas.
+        self.rate_limit = rate_limit if rate_limit is not None else RateLimitGate()
 
     @asynccontextmanager
     async def acquire(self) -> AsyncIterator[AsyncSession]:
+        # Tras un 429 reciente se espera dentro del presupuesto o se falla sin enviar nada.
+        await self.rate_limit.wait_or_fail()
         # El lock garantiza que una sola operación navegue a la vez sobre la página compartida.
         async with self._lock:
             # Si el proceso murió, se descarta y se abre uno nuevo en lugar de fallar.
@@ -51,8 +62,13 @@ class CampusSession:
             if self._watcher is None:
                 self._watcher = asyncio.create_task(self._close_when_idle())
             # Al terminar la operación (bien o mal) se reinicia el contador de inactividad.
+            # Un error de límite de solicitudes de cualquier área activa la pausa compartida.
             try:
                 yield self._page
+            except CampusError as exc:
+                if is_rate_limit_code(exc.code):
+                    self.rate_limit.note(exc.retry_after)
+                raise
             finally:
                 self._last_used = time.monotonic()
 

@@ -7,15 +7,19 @@ from anyio import to_thread
 from utnfrsf_campus_mcp.browser.downloads import download_file, session_cookie_jar
 from utnfrsf_campus_mcp.browser.session import CampusSession
 from utnfrsf_campus_mcp.config import CAMPUS_BASE_URL
-from utnfrsf_campus_mcp.errors import CourseError, DownloadError
+from utnfrsf_campus_mcp.errors import CourseError, DownloadError, SubmissionError
 from utnfrsf_campus_mcp.models import Course, DownloadedResources, DownloadFailure
-from utnfrsf_campus_mcp.parsers.resources import clean_link, file_module_type
+from utnfrsf_campus_mcp.parsers.resources import clean_link, file_module_type, is_assignment_file
 from utnfrsf_campus_mcp.services.resources import ResourceService
+from utnfrsf_campus_mcp.services.submissions import SubmissionService
 
 
 class DownloadService:
-    def __init__(self, resources: ResourceService, session: CampusSession) -> None:
+    def __init__(
+        self, resources: ResourceService, session: CampusSession, submissions: SubmissionService
+    ) -> None:
         self._resources = resources
+        self._submissions = submissions
         self._session = session
         # Raíz fija de descargas: el usuario no elige destino, para impedir escrituras arbitrarias.
         self._root = (Path.cwd() / "downloads").resolve()
@@ -74,6 +78,8 @@ class DownloadService:
                     )
                     # ...salvo los fallos de acceso, que afectarían a todos: se detiene la
                     # descarga y los archivos restantes quedan marcados como no intentados.
+                    if exc.code == "DOWNLOAD_RATE_LIMITED":
+                        self._session.rate_limit.note(exc.retry_after)
                     if exc.code in (
                         "DOWNLOAD_SESSION_EXPIRED",
                         "DOWNLOAD_ACCESS_DENIED",
@@ -103,8 +109,11 @@ class DownloadService:
         """Archivos que el campus muestra hoy en el módulo, para verificar la selección.
 
         Si la ruta de los archivos indica el tipo de módulo, alcanza con leer su página.
-        Si no, se recurre al inventario completo del curso, más lento pero general.
+        Los archivos de devolución o de entrega de una tarea se verifican contra la página
+        de la tarea. Si no, se recurre al inventario completo del curso, más lento pero general.
         """
+        if all(is_assignment_file(url) for url in urls):
+            return await self._assignment_files(course_id, module_id)
         types = {file_module_type(url) for url in urls}
         if len(types) == 1 and (module_type := types.pop()):
             try:
@@ -121,3 +130,21 @@ class DownloadService:
             row.url for row in inventory.links if row.module_id == module_id and row.kind == "file"
         }
         return inventory.course, allowed
+
+    async def _assignment_files(self, course_id: int, module_id: int) -> tuple[Course, set[str]]:
+        """Archivos que la tarea muestra hoy en la devolución del docente y en la entrega.
+
+        Reutiliza la lectura de get_assignment_feedback, que confirma que la página es esa
+        tarea de esa materia. Si no hay devolución visible, solo quedan los entregados.
+        """
+        try:
+            feedback = await self._submissions.get_assignment_feedback(course_id, module_id)
+        except SubmissionError as exc:
+            if exc.code == "SUBMISSION_INVALID_ACTIVITY":
+                raise DownloadError(
+                    "DOWNLOAD_NOT_IN_COURSE",
+                    "Los archivos deben figurar en el módulo indicado del curso.",
+                ) from None
+            raise
+        course = await self._resources.find_course(course_id)
+        return course, {f.url for f in [*feedback.feedback_files, *feedback.submission_files]}

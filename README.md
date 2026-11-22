@@ -2,62 +2,82 @@
 
 Un servidor MCP para conectar asistentes de inteligencia artificial con el [Campus Virtual de la UTN Facultad Regional Santa Fe](https://campusvirtual.frsf.utn.edu.ar/).
 
-Su objetivo es facilitar las tareas cotidianas del estudiante desde un asistente, usando su cuenta del campus.
+Permite preguntarle a un asistente cosas como “¿qué trabajos vencen este mes?”, “descargá la bibliografía de Análisis Numérico” o “¿qué nota me pusieron en el TP 3?”, usando tu propia cuenta del campus.
 
-> Proyecto en desarrollo. Incluye inicio de sesión, consulta mensual de actividades y listado de enlaces por asignatura y flujo de carga/entrega de tareas. La carga y entrega se verificaron en una tarea real autorizada.
+> **Vista previa (0.2.0).** Las herramientas funcionan y se probaron contra el campus real, pero algunas solo para parte de su alcance. `get_server_info` informa el nivel de verificación de cada una. Ver [cambios](CHANGELOG.md).
 
-`login()` usa las credenciales del `.env` privado. `list_monthly_activities()` devuelve JSON con las fechas, horarios, asignaturas y enlaces directos de las actividades del calendario. Podés probarlas en Inspector siguiendo la [guía de desarrollo](docs/desarrollo.md). Los parámetros y ejemplos de la consulta mensual están en [su guía](docs/calendario.md).
+## Qué puede hacer
 
-`list_courses()` devuelve las materias visibles en Grado, con ID, nombre y enlace, incluidos años anteriores. Permite encontrar la materia antes de consultar recursos o entregas. Ver [alcance y verificación](docs/materias.md).
+| Área | Herramientas |
+| --- | --- |
+| Sesión y estado | `login`, `get_server_info` |
+| Materias y agenda | `list_courses`, `list_monthly_activities` |
+| Contenido | `get_course_resources`, `get_section_content`, `get_page_content`, `get_folder_content` |
+| Avisos y foros | `list_forum_discussions`, `get_forum_discussion` |
+| Materiales | `download_resources` (a `downloads/`) |
+| Entregas | `get_submission_status`, `get_assignment_feedback`, `prepare_submission`, `upload_files`, `submit_assignment` |
 
-`get_course_resources(course_id)` lista los enlaces de una materia, incluidas tareas, archivos y materiales de carpetas. Recorre secciones y devuelve el alcance de la consulta. Ver [uso y límites](docs/recursos.md); verificada en Análisis Numérico (`topics`); queda pendiente la validación integral de `onetopic`.
+Las entregas se hacen en pasos separados. `prepare_submission` valida los archivos en tu computadora, `upload_files` los sube a un área temporal y `submit_assignment` guarda la entrega y verifica en el campus cómo quedó. Ninguna herramienta reemplaza ni retira una entrega existente.
 
-`get_section_content(course_id, section)`, `get_page_content(course_id, module_id)` y `get_folder_content(course_id, module_id)` leen como Markdown el texto publicado en secciones, páginas y descripciones de carpetas, incluidas tablas como los cronogramas.
+## Requisitos
 
-`download_resources(course_id, module_id, urls)` descarga archivos de cualquier tipo del módulo indicado a `downloads/`, valida la transferencia y devuelve rutas, tamaños y hashes. Ver [uso y límites](docs/descargas.md).
+- macOS o Linux (glibc 2.35 o superior, por ejemplo Ubuntu 22.04+). **Windows no está soportado**; usá WSL 2.
+- Python 3.11 o posterior.
+- Una cuenta del Campus Virtual UTN FRSF.
 
-`get_server_info()` indica qué herramientas están verificadas en el campus, cuáles solo parcialmente y cuáles tienen solo pruebas locales, con sus límites conocidos.
+[Lightpanda](https://lightpanda.io/), el navegador que usa el servidor, se instala con el paquete de Python. No hace falta Chrome.
 
-`get_assignment_feedback()` muestra la devolución del docente en una tarea: nota, fecha, quién corrigió, comentarios y archivos devueltos.
+## Instalación
 
-`get_submission_status()` consulta una tarea; `prepare_submission()` valida archivos localmente; `upload_files()` los carga a un área temporal; `submit_assignment()` guarda y, opcionalmente, finaliza la entrega. Ver [contrato y verificación](docs/entregas.md). La carga y el guardado se verificaron mediante MCP en el TP 6 de Análisis Numérico, con estado final enviado y comprobación de los bytes.
-
-## Funciones previstas
-
-- Consultar materias, actividades y consignas.
-- Revisar fechas de entrega y eventos del calendario.
-- Descargar bibliografía, apuntes y otros materiales.
-- Enviar trabajos prácticos, consultar el estado de las entregas y leer sus devoluciones.
-
-## Cómo funciona
-
-El asistente recibe un pedido en lenguaje natural, como “¿qué trabajos vencen esta semana?” o “descargá la bibliografía de esta materia”. A través de MCP, solicita las acciones necesarias al servidor.
-
-El servidor utiliza [Lightpanda](https://lightpanda.io/), un navegador que funciona en segundo plano, para acceder al campus, consultar información o realizar la acción solicitada. Luego devuelve el resultado al asistente.
-
-El acceso se limita a las materias y recursos disponibles para la cuenta del estudiante.
-
-## Estructura
-
-```text
-src/utnfrsf_campus_mcp/
-├── server.py       # Arranque del servidor MCP.
-├── config.py       # Configuración desde .env y variables de entorno.
-├── models.py       # Modelos de datos.
-├── browser/        # Integración con Lightpanda.
-├── parsers/        # Extracción de información del campus.
-├── services/       # Lógica de las funcionalidades.
-└── tools/          # Herramientas expuestas al asistente.
-docs/               # Documentación de desarrollo.
-examples/           # Ejemplos de configuración MCP.
-.env.example        # Plantilla de configuración local.
-pyproject.toml      # Paquete y dependencias.
-uv.lock             # Versiones de dependencias.
-roadmap.md          # Plan de implementación.
-AGENTS.md           # Guía para agentes de desarrollo.
+```bash
+git clone https://github.com/thiagoyb11/UTNFRSF-CampusVirtual-MCP.git
+cd UTNFRSF-CampusVirtual-MCP
+python3 -m pip install --user .
+python3 scripts/smoke_mcp.py --with-lightpanda
 ```
 
-Documentación técnica: [desarrollo local](docs/desarrollo.md) · [roadmap](roadmap.md) · [análisis y funcionalidades pendientes](docs/funcionalidades-pendientes.md).
+La última línea comprueba la instalación sin usar tu cuenta. Si tu Python pide `--break-system-packages`, agregalo al comando de pip. Para instalar las versiones exactas del lockfile, seguí la [guía de desarrollo](docs/desarrollo.md#instalación-con-versiones-exactas).
+
+## Configuración
+
+Copiá `.env.example` como `.env` en la carpeta del proyecto y completá tu usuario y contraseña:
+
+```dotenv
+UTN_CAMPUS_USERNAME=tu_usuario
+UTN_CAMPUS_PASSWORD=tu_contraseña
+```
+
+Las credenciales quedan solo en ese archivo, que Git ignora. El asistente nunca las ve ni las pide como parámetro. Las demás variables son opcionales y están descritas en la [guía de desarrollo](docs/desarrollo.md#configurar-el-acceso).
+
+## Conectar a un asistente
+
+Agregá el servidor a la configuración MCP de tu cliente (Claude Desktop, Claude Code, etc.) con [examples/mcp.json](examples/mcp.json) como modelo. `cwd` debe ser la ruta absoluta de esta carpeta, porque desde ahí se lee `.env`, y `command` debe apuntar al Python donde lo instalaste:
+
+```json
+{
+  "mcpServers": {
+    "utnfrsf-campus": {
+      "command": "python3",
+      "args": ["-m", "utnfrsf_campus_mcp"],
+      "cwd": "/ruta/absoluta/UTNFRSF-CampusVirtual-MCP"
+    }
+  }
+}
+```
+
+## Limitaciones conocidas
+
+- Solo se listan las materias de **Grado**.
+- Los inventarios de materias con formato `onetopic`, algunos modos de descarga y las variantes de entrega distintas de “subir archivos” no están validados en todos los casos (F12, F13 y F26).
+- Todo se probó con una sola cuenta de estudiante.
+- Si el campus limita las solicitudes (HTTP 429), el servidor hace una pausa común a todas las herramientas y responde `CAMPUS_RATE_LIMITED` con los segundos que faltan. No repite operaciones solo.
+- El servidor automatiza tu cuenta: revisá lo que el asistente propone antes de autorizar una entrega.
+
+El detalle por herramienta está en `docs/` y el trabajo pendiente en el [inventario de funcionalidades](docs/funcionalidades-pendientes.md) y el [roadmap](roadmap.md).
+
+## Desarrollo
+
+Ver la [guía de desarrollo](docs/desarrollo.md): arquitectura, configuración completa, controles, CI y pruebas contra el campus.
 
 ## Licencia
 

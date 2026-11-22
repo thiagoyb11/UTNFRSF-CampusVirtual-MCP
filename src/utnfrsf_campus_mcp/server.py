@@ -11,6 +11,7 @@ from mcp.server import MCPServer
 from pydantic import ValidationError
 
 from utnfrsf_campus_mcp.browser.lightpanda import LightpandaBrowser
+from utnfrsf_campus_mcp.browser.rate_limit import RateLimitGate
 from utnfrsf_campus_mcp.browser.session import CampusSession
 from utnfrsf_campus_mcp.config import Settings
 from utnfrsf_campus_mcp.services.authentication import AuthenticationService
@@ -34,7 +35,11 @@ def create_server(settings: Settings | None = None) -> MCPServer:
     """Construye el servidor sin abrir el navegador ni realizar peticiones de red."""
     config = settings if settings is not None else Settings()
     # Una sola sesión de navegador compartida por todas las herramientas; se abre bajo demanda.
-    session = CampusSession(LightpandaBrowser(config), config.browser_idle_seconds)
+    session = CampusSession(
+        LightpandaBrowser(config),
+        config.browser_idle_seconds,
+        RateLimitGate(config.rate_limit_cooldown_seconds, config.rate_limit_max_wait_seconds),
+    )
 
     # Al apagar el servidor se cierra Lightpanda aunque haya quedado abierto.
     @asynccontextmanager
@@ -55,9 +60,10 @@ def create_server(settings: Settings | None = None) -> MCPServer:
     register_courses(server, courses)
     resources = ResourceService(config, session, courses)
     register_resources(server, resources)
-    register_downloads(server, DownloadService(resources, session))
+    submissions = SubmissionService(config, session, authentication)
+    register_downloads(server, DownloadService(resources, session, submissions))
     register_forums(server, ForumService(config, session, resources))
-    register_submissions(server, SubmissionService(config, session, authentication))
+    register_submissions(server, submissions)
     return server
 
 

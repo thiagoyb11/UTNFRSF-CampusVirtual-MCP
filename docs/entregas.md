@@ -104,13 +104,13 @@ Inspeccionada el 9 de noviembre de 2026, en solo lectura, en siete tareas de cua
 - Las filas se clasifican sin leer etiquetas: perfil del docente, clases `summary_assignfeedback_<plugin>` y, para las anteriores, el orden nota/fecha. Si ese orden no puede confirmarse, la respuesta se marca `complete=false`.
 - `grade` conserva el texto del campus («Aprobado», «88.00 / 100.00»). `grade_value` y `grade_max` solo se completan para `x / y`; no se calculan porcentajes ni promedios.
 - `graded_at` se interpreta con la zona del perfil del campus (`timezone_source=campus`) o, si falta, con la configurada, y se avisa. Si la fecha no se reconoce, se devuelve solo `graded_at_text`.
-- `comments` reúne el texto del plugin `comments` con sus saltos de párrafo. `feedback_files` incluye solo enlaces `/pluginfile.php/.../assignfeedback_*` del campus sin secretos; `submission_files` son los archivos entregados por la cuenta.
+- `comments` reúne el texto del plugin `comments` con sus saltos de párrafo. `feedback_files` incluye solo enlaces `/pluginfile.php/.../assignfeedback_*` del campus sin secretos; `submission_files` son los archivos entregados por la cuenta. Ambos se pueden bajar con `download_resources(course_id, <id de la tarea>, urls)`: la descarga los verifica contra esta misma lectura de la tarea, porque no figuran en la página del módulo.
 - Un comentario resumido con enlace `action=viewpluginassignfeedback`, una rúbrica o guía (`gradingform_*`), filas extra o archivos fuera de un plugin generan `complete=false` y un aviso. Los enlaces externos de un comentario quedan en el texto y no se siguen.
 - `available=false` indica que no hay bloque de devolución visible. No distingue una tarea sin calificar de una nota oculta o no publicada.
 
 ### Verificación real
 
-Se verificó mediante MCP el 9 de noviembre de 2026 en siete tareas: dos con escala y comentarios, una de ellas con varios párrafos; dos con puntos sobre 100 y comentarios; una con puntos sin comentarios; y dos sin devolución, que devolvieron `available=false`. Las fechas se interpretaron con la zona del campus. No hubo casos reales con archivos devueltos, anotaciones PDF ni rúbricas: esas variantes solo tienen pruebas locales.
+Se verificó mediante MCP el 9 de noviembre de 2026 en siete tareas: dos con escala y comentarios, una de ellas con varios párrafos; dos con puntos sobre 100 y comentarios; una con puntos sin comentarios; y dos sin devolución, que devolvieron `available=false`. Las fechas se interpretaron con la zona del campus. No hubo casos reales con archivos devueltos ni rúbricas: esas variantes solo tienen pruebas locales. El 21 de noviembre de 2026 se verificó un PDF anotado (`assignfeedback_editpdf`) de la Guía 3 de Bases de Datos NoSQL: aparece en `feedback_files` y `download_resources` lo descargó completo (483 KB, con el índice de comentarios de la docente al final).
 
 ## Código y controles locales
 

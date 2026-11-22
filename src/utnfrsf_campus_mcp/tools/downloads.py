@@ -3,13 +3,12 @@
 from typing import Annotated
 
 from mcp.server import MCPServer
-from mcp.server.mcpserver.exceptions import ToolError
 from mcp.types import ToolAnnotations
 from pydantic import Field
 
-from utnfrsf_campus_mcp.errors import CourseError, DownloadError, LoginError
 from utnfrsf_campus_mcp.models import DownloadedResources
 from utnfrsf_campus_mcp.services.downloads import DownloadService
+from utnfrsf_campus_mcp.tools.errors import tool_errors
 
 
 def register_downloads(server: MCPServer, service: DownloadService) -> None:
@@ -23,23 +22,33 @@ def register_downloads(server: MCPServer, service: DownloadService) -> None:
             open_world_hint=True,
         )
     )
+    @tool_errors("downloads")
     async def download_resources(
         course_id: Annotated[int, Field(gt=0, description="ID de la asignatura de Grado.")],
         module_id: Annotated[
-            int, Field(gt=0, description="ID del módulo donde aparecen los archivos.")
+            int,
+            Field(
+                gt=0,
+                description="ID del módulo donde aparecen los archivos (la tarea, para los "
+                "archivos de su devolución o entrega).",
+            ),
         ],
         urls: Annotated[
             list[str],
             Field(
                 min_length=1,
                 max_length=10,
-                description="Enlaces de archivo de get_course_resources, en el orden solicitado.",
+                description="Enlaces de archivo de get_course_resources, o de "
+                "get_assignment_feedback (feedback_files y submission_files), en el orden "
+                "solicitado.",
             ),
         ],
     ) -> DownloadedResources:
         """Descarga entre 1 y 10 archivos del campus a downloads/course-ID/module-ID/.
 
-        Verifica su pertenencia al módulo y a la materia con una consulta autenticada nueva.
+        Verifica su pertenencia al módulo y a la materia con una consulta autenticada nueva;
+        los archivos devueltos por el docente (p. ej. el PDF anotado) o entregados en una
+        tarea se verifican contra la página de esa tarea.
         Usa la sesión de Lightpanda y un transporte HTTP binario del mismo origen. Valida
         respuesta HTTP y tamaño; calcula SHA-256 y detecta páginas de login/error de Moodle.
         Admite cualquier extensión y MIME; no valida el formato interno ni ejecuta archivos.
@@ -47,11 +56,4 @@ def register_downloads(server: MCPServer, service: DownloadService) -> None:
         tamaños, hashes y fallos por archivo. Solo archivos del campus, sin destinos externos.
         No modifica entregas del campus.
         """
-        # Los fallos por archivo vuelven dentro del resultado (failures); solo los errores
-        # que impiden toda la operación llegan acá y se convierten en errores MCP.
-        try:
-            return await service.download_resources(course_id, module_id, urls)
-        except (CourseError, DownloadError, LoginError) as exc:
-            raise ToolError(str(exc)) from None
-        except Exception:
-            raise ToolError("DOWNLOAD_INTERNAL_ERROR: No se pudo completar la descarga.") from None
+        return await service.download_resources(course_id, module_id, urls)

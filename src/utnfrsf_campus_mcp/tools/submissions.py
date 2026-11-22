@@ -3,11 +3,9 @@
 from typing import Annotated
 
 from mcp.server import MCPServer
-from mcp.server.mcpserver.exceptions import ToolError
 from mcp.types import ToolAnnotations
 from pydantic import Field
 
-from utnfrsf_campus_mcp.errors import DownloadError, LoginError, SubmissionError
 from utnfrsf_campus_mcp.models import (
     AssignmentFeedback,
     PreparedSubmission,
@@ -16,6 +14,7 @@ from utnfrsf_campus_mcp.models import (
     UploadedFiles,
 )
 from utnfrsf_campus_mcp.services.submissions import SubmissionService
+from utnfrsf_campus_mcp.tools.errors import tool_errors
 
 # Tipos de parámetro compartidos: IDs positivos y una lista acotada de rutas locales.
 Id = Annotated[int, Field(gt=0, description="ID de la materia o módulo, según el parámetro.")]
@@ -31,6 +30,8 @@ Files = Annotated[
 
 def register_submissions(server: MCPServer, service: SubmissionService) -> None:
     # Dos perfiles de anotación: consulta del estado (lectura) y carga/guardado (escritura).
+    # Ante un fallo inesperado, el área "submissions" avisa que hay que consultar el estado
+    # antes de repetir, porque pudo haberse escrito algo.
     read = ToolAnnotations(
         read_only_hint=True, destructive_hint=False, idempotent_hint=True, open_world_hint=True
     )
@@ -38,44 +39,27 @@ def register_submissions(server: MCPServer, service: SubmissionService) -> None:
         read_only_hint=False, destructive_hint=False, idempotent_hint=False, open_world_hint=True
     )
 
-    # Envoltorio común: traduce errores de dominio a errores MCP. Ante un fallo inesperado
-    # avisa que hay que consultar el estado antes de repetir, porque pudo haberse escrito algo.
-    async def call(method, *args):
-        try:
-            return await method(*args)
-        except (SubmissionError, LoginError, DownloadError) as exc:
-            raise ToolError(str(exc)) from None
-        except Exception:
-            raise ToolError(
-                "SUBMISSION_INTERNAL_ERROR: No se completó la operación; "
-                "verificá el estado antes de repetir escrituras."
-            ) from None
-
     # Paso 1 (local): valida archivos y calcula hashes; no toca el campus (open_world_hint=False).
     @server.tool(
         annotations=ToolAnnotations(
             read_only_hint=True, destructive_hint=False, idempotent_hint=True, open_world_hint=False
         )
     )
+    @tool_errors("local_files")
     def prepare_submission(course_id: Id, activity_id: Id, files: Files) -> PreparedSubmission:
         """Prepara archivos y hashes localmente; no inicia sesión ni escribe en el campus."""
-        try:
-            return service.prepare_submission(course_id, activity_id, files)
-        except SubmissionError as exc:
-            raise ToolError(str(exc)) from None
-        except Exception:
-            raise ToolError(
-                "UPLOAD_LOCAL_FILE_ERROR: No se pudieron preparar los archivos."
-            ) from None
+        return service.prepare_submission(course_id, activity_id, files)
 
     # Consulta del estado actual de la entrega; se usa antes y después de escribir.
     @server.tool(annotations=read)
+    @tool_errors("submissions")
     async def get_submission_status(course_id: Id, activity_id: Id) -> SubmissionStatus:
         """Consulta estado y archivos de una tarea assign, conservando la evidencia original."""
-        return await call(service.get_submission_status, course_id, activity_id)
+        return await service.get_submission_status(course_id, activity_id)
 
     # Devolución del docente: nota, fecha, docente, comentarios y archivos devueltos.
     @server.tool(annotations=read)
+    @tool_errors("submissions")
     async def get_assignment_feedback(course_id: Id, activity_id: Id) -> AssignmentFeedback:
         """Consulta la devolución de una tarea assign: nota, fecha, docente y comentarios.
 
@@ -84,10 +68,11 @@ def register_submissions(server: MCPServer, service: SubmissionService) -> None:
         de los entregados. available=false indica que la cuenta no ve devolución, sin
         distinguir entre una tarea sin calificar y una calificación no publicada.
         """
-        return await call(service.get_assignment_feedback, course_id, activity_id)
+        return await service.get_assignment_feedback(course_id, activity_id)
 
     # Paso 2: sube los archivos al área temporal de Moodle y devuelve un recibo (upload_id).
     @server.tool(annotations=write)
+    @tool_errors("submissions")
     async def upload_files(course_id: Id, activity_id: Id, files: Files) -> UploadedFiles:
         """Carga y verifica archivos en el área temporal de una tarea abierta; devuelve un recibo.
 
@@ -95,10 +80,11 @@ def register_submissions(server: MCPServer, service: SubmissionService) -> None:
         cualquier tipo permitido, incluidos ZIP; rechaza carpetas y reemplazos de entregas.
         No guarda ni envía la entrega. El recibo dura 30 minutos en este proceso MCP.
         """
-        return await call(service.upload_files, course_id, activity_id, files)
+        return await service.upload_files(course_id, activity_id, files)
 
     # Paso 3: guarda (y opcionalmente envía) la entrega usando el recibo del paso 2.
     @server.tool(annotations=write)
+    @tool_errors("submissions")
     async def submit_assignment(
         upload_id: str, finalize: bool = False, accept_statement: bool = False
     ) -> SubmissionResult:
@@ -110,4 +96,4 @@ def register_submissions(server: MCPServer, service: SubmissionService) -> None:
         ni reenvía POSTs de resultado incierto. Solo invocar para una entrega autorizada con
         esos archivos y destino; upload_files por sí sola no autoriza este guardado.
         """
-        return await call(service.submit_assignment, upload_id, finalize, accept_statement)
+        return await service.submit_assignment(upload_id, finalize, accept_statement)

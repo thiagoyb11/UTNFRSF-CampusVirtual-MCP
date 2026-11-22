@@ -3,44 +3,35 @@
 # Todas las excepciones siguen el mismo patrón: un código estable (por ejemplo
 # DOWNLOAD_NOT_IN_COURSE) que el código puede comparar, y un mensaje en español para el
 # usuario. str(exc) produce "CODIGO: mensaje", que es lo que reciben las herramientas MCP.
-# Hay una clase por área para que cada herramienta capture solo los errores que le tocan.
+# Hay una clase por área; todas heredan de CampusError, que tools/errors.py traduce a un
+# error MCP en un único lugar.
 
 
-class LoginError(Exception):
+class CampusError(Exception):
+    """Base de los errores de dominio: código estable y mensaje seguro para el cliente."""
+
+    def __init__(self, code: str, message: str, retry_after: float | None = None) -> None:
+        self.code = code
+        # Segundos que pidió el campus (Retry-After) ante un límite de solicitudes, si los dio.
+        self.retry_after = retry_after
+        super().__init__(f"{code}: {message}")
+
+
+class LoginError(CampusError):
     """Solo recibe códigos y mensajes propios, nunca respuestas del navegador."""
 
-    def __init__(self, code: str, message: str) -> None:
-        self.code = code
-        super().__init__(f"{code}: {message}")
 
-
-class CalendarError(Exception):
+class CalendarError(CampusError):
     """Error de consulta con código y mensaje aptos para el cliente MCP."""
 
-    def __init__(self, code: str, message: str) -> None:
-        self.code = code
-        super().__init__(f"{code}: {message}")
 
-
-class CourseError(Exception):
+class CourseError(CampusError):
     """Fallo seguro al identificar o consultar las asignaturas de la cuenta."""
 
-    def __init__(self, code: str, message: str) -> None:
-        self.code = code
-        super().__init__(f"{code}: {message}")
 
-
-class DownloadError(Exception):
+class DownloadError(CampusError):
     """Fallo seguro de una descarga autenticada o de su destino local."""
 
-    def __init__(self, code: str, message: str) -> None:
-        self.code = code
-        super().__init__(f"{code}: {message}")
 
-
-class SubmissionError(Exception):
+class SubmissionError(CampusError):
     """Error de carga o entrega sin respuestas remotas, tokens ni credenciales."""
-
-    def __init__(self, code: str, message: str) -> None:
-        self.code = code
-        super().__init__(f"{code}: {message}")

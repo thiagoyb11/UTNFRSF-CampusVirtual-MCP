@@ -12,6 +12,7 @@ from urllib.parse import parse_qs, urlencode, urljoin, urlsplit
 from urllib.request import HTTPCookieProcessor, Request, build_opener
 
 from utnfrsf_campus_mcp.browser.downloads import _NoRedirect
+from utnfrsf_campus_mcp.browser.rate_limit import parse_retry_after
 from utnfrsf_campus_mcp.config import CAMPUS_BASE_URL
 from utnfrsf_campus_mcp.errors import SubmissionError
 from utnfrsf_campus_mcp.models import LocalSubmissionFile, UploadLimits
@@ -82,7 +83,8 @@ class CampusHTTP:
                 return result
         except HTTPError as exc:
             status, location = exc.code, exc.headers.get("Location")
-            retry_after = exc.headers.get("Retry-After", "2")
+            retry_header = exc.headers.get("Retry-After")
+            retry_after = retry_header or "2"
             exc.close()
             # Un 429 en una lectura se reintenta hasta 2 veces si Retry-After es razonable.
             # Las escrituras nunca se reintentan.
@@ -91,6 +93,7 @@ class CampusHTTP:
                     raise fail(
                         "SUBMISSION_RATE_LIMITED",
                         "El campus pide esperar antes de leer el formulario.",
+                        parse_retry_after(retry_header),
                     ) from None
                 time.sleep(max(1, int(retry_after)))
                 return self.document(url, _read_attempt=_read_attempt + 1)
@@ -112,7 +115,9 @@ class CampusHTTP:
                 return self.document(target)
             code = "SUBMISSION_RATE_LIMITED" if status == 429 else "SUBMISSION_ACCESS_DENIED"
             raise fail(
-                code, f"HTTP {status} en {method} {urlsplit(url).path}; no se reenvió el POST."
+                code,
+                f"HTTP {status} en {method} {urlsplit(url).path}; no se reenvió el POST.",
+                parse_retry_after(retry_header) if status == 429 else None,
             ) from None
         # Un corte de red durante un POST deja el resultado incierto: pudo haberse guardado.
         except (OSError, URLError, HTTPException, TimeoutError):

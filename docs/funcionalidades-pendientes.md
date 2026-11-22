@@ -64,7 +64,7 @@ Hay **dieciséis herramientas registradas**:
 
 La arquitectura separa herramientas, servicios, parsers y navegador. Ya hay comprobaciones de origen, sesión, resultados parciales y hashes, además de protección frente a reemplazos y reenvíos inciertos. Esas capacidades no deben figurar como si faltaran desde cero.
 
-La auditoría documental anterior citaba **138 pruebas locales** y **3 integraciones de transporte con Lightpanda sobre un servidor sintético**. Con la incorporación de `list_courses`, `bash scripts/test.sh` aprobó **145 pruebas locales**, con **13 integraciones optativas omitidas**, además de lint y formato. La herramienta nueva se verificó por separado contra el campus mediante MCP stdio; no se repitieron las integraciones de transporte ni escrituras académicas. Los tests están ignorados por preferencia del proyecto y no están disponibles en un clon limpio. Con el catálogo de capacidades de F45, la misma ejecución aprobó **151 pruebas locales**, con las mismas **13 integraciones optativas omitidas**, además de lint y formato.
+La auditoría documental anterior citaba **138 pruebas locales** y **3 integraciones de transporte con Lightpanda sobre un servidor sintético**. Con la incorporación de `list_courses`, `bash scripts/test.sh` aprobó **145 pruebas locales**, con **13 integraciones optativas omitidas**, además de lint y formato. La herramienta nueva se verificó por separado contra el campus mediante MCP stdio; no se repitieron las integraciones de transporte ni escrituras académicas. Los tests están ignorados por preferencia del proyecto y no están disponibles en un clon limpio. Con el catálogo de capacidades de F45, la misma ejecución aprobó **151 pruebas locales**, con las mismas **13 integraciones optativas omitidas**, además de lint y formato. Tras F50 y F41 (18 de noviembre de 2026), la suite aprobó **303 pruebas locales** con las mismas **13 integraciones optativas omitidas**; además, `scripts/smoke_mcp.py --with-lightpanda`, versionado y ejecutado por el CI, ofrece un control mínimo que sí está disponible en un clon limpio.
 
 ## Cómo usar y mantener esta lista
 
@@ -206,7 +206,8 @@ La auditoría documental anterior citaba **138 pruebas locales** y **3 integraci
   - Ampliar el detalle de tareas con comentarios del docente, calificación y adjuntos de devolución cuando existan.
   - **Implementado (9 de noviembre de 2026):** `get_assignment_feedback(course_id, activity_id)` lee el bloque `.feedback` de la tarea ya validada por `get_submission_status`. Devuelve nota original (puntos o escala) y, si es `x / y`, valor y máximo; fecha con zona; docente; comentarios por plugin; archivos devueltos separados de los entregados; filas originales como evidencia y `complete`/`warnings`. Clasifica filas por señales estructurales (perfil `/user/view.php`, clases `summary_assignfeedback_<plugin>`), no por etiquetas traducidas. Ver [entregas](entregas.md#devolución-del-docente).
   - **Verificado:** mediante MCP en siete tareas reales de cuatro materias: escalas («Aprobado», «Incompleto»), puntos sobre 100, comentarios de uno y varios párrafos, tarea sin comentarios y dos tareas sin devolución (`available=false`). Pruebas locales con fixtures sintéticas. El 11 de noviembre de 2026 se repitió mediante MCP en seis tareas entregadas de Bases de Datos No SQL, todas sin calificar (`available=false`, con sus archivos entregados), y en una tarea con nota sobre 100 de otra materia.
-  - **Pendiente:** archivos devueltos (`assignfeedback_file`), anotaciones PDF (`assignfeedback_editpdf`) y rúbricas o guías no aparecieron en las tareas inspeccionadas; se detectan y se declaran incompletas, pero su extracción no se verificó. Un comentario resumido devuelve `full_view_url` sin seguirlo. Sin devolución visible no se distingue «sin calificar» de «no publicada».
+  - **Implementado (21 de noviembre de 2026):** `download_resources` acepta los enlaces de `feedback_files` y `submission_files` con el id de la tarea como `module_id`; los verifica contra la devolución leída en ese momento. Verificado con un PDF anotado real (`assignfeedback_editpdf`).
+  - **Pendiente:** archivos devueltos (`assignfeedback_file`) y rúbricas o guías no aparecieron en las tareas inspeccionadas; se detectan y se declaran incompletas, pero su extracción no se verificó. Un comentario resumido devuelve `full_view_url` sin seguirlo. Sin devolución visible no se distingue «sin calificar» de «no publicada».
   - **Cierre:** distingue archivos enviados de archivos devueltos y enlaza sus fuentes; las anotaciones de PDF o rúbricas se declaran incompletas si no pueden extraerse.
 
 - [ ] **F30 — Consultar asistencia propia.** **P2 · Explorar.**
@@ -262,8 +263,11 @@ La auditoría documental anterior citaba **138 pruebas locales** y **3 integraci
 
 ## H. Confiabilidad y mantenimiento del MCP
 
-- [ ] **F41 — Coordinar límites de solicitudes entre servicios.** **P0 · Parcial.**
-  - Unificar información de HTTP 429, Retry-After, presupuesto y espera entre login, inventarios, descargas y cargas. Existen controles locales, pero no una coordinación general.
+- [ ] **F41 — Coordinar límites de solicitudes entre servicios.** **P0 · Implementada; falta validación real.**
+  - Unificar información de HTTP 429, Retry-After, presupuesto y espera entre login, inventarios, descargas y cargas.
+  - Implementación (18 de noviembre de 2026): `browser/rate_limit.py` define `RateLimitGate`, que vive en `CampusSession`. Todo error de dominio `*_RATE_LIMITED` que sale de `acquire()` (login, calendario, recursos, entregas) y el `DOWNLOAD_RATE_LIMITED` por archivo activan una pausa común. La pausa respeta `Retry-After` en segundos (descargas y formularios de entrega lo propagan en `CampusError.retry_after`), con tope de 600 s, o usa `UTN_CAMPUS_RATE_LIMIT_COOLDOWN_SECONDS` (30). La siguiente operación espera si faltan como máximo `UTN_CAMPUS_RATE_LIMIT_MAX_WAIT_SECONDS` (10). Si falta más, falla con `CAMPUS_RATE_LIMITED` y los segundos restantes, antes de abrir el navegador o enviar nada. No repite operaciones; los reintentos propios del login y de lecturas de formularios se conservan.
+  - **Evidencia:** solo pruebas locales (`tests/test_rate_limit.py`, 12 casos): Retry-After numérico y fecha ignorada, tope, una pausa más corta no acorta la activa, espera dentro del presupuesto, fallo inmediato fuera de él sin abrir el navegador, propagación desde cuatro áreas y errores que no son 429. No se provocó un 429 real a propósito.
+  - **Pendiente:** observar un 429 real (sin forzarlo) y confirmar que la herramienta siguiente informa `CAMPUS_RATE_LIMITED` o espera según corresponda; evaluar si el calendario y los inventarios en JavaScript pueden leer `Retry-After`.
   - **Cierre:** lecturas con esperas acotadas e información accionable; ninguna escritura se repite a ciegas. La pausa de 90 segundos que permitió la prueba del TP 6 no se convierte en garantía universal.
 
 - [ ] **F42 — Recuperar sesión o navegador de forma controlada.** **P1 · Parcial.**
@@ -287,6 +291,9 @@ La auditoría documental anterior citaba **138 pruebas locales** y **3 integraci
 
 - [ ] **F46 — Hacer reproducibles instalación y controles.** **P1 · Parcial.**
   - Verificar un clon limpio con Python global y dependencias declaradas; automatizar controles disponibles como lint y formato. Mantener explícito que los tests locales están ignorados.
+  - Avance (18 de noviembre de 2026): `scripts/smoke_mcp.py` comprueba el paquete instalado sin cuenta ni red externa. Arranca el MCP por stdio, verifica que `get_server_info` documente exactamente las herramientas registradas y que una consulta sin credenciales falle con `LOGIN_CREDENTIALS_MISSING`. Con `--with-lightpanda`, también ejecuta JavaScript en Lightpanda sobre una página local. `.github/workflows/ci.yml` corre lint, formato e instalación desde `uv.lock` con el smoke test en Ubuntu 24.04 y macOS 14, Python 3.11 y 3.13. `docs/desarrollo.md` documenta plataformas (Windows no soportado: Lightpanda 1.0.2 no publica binario) e instalación con versiones exactas.
+  - **Evidencia:** en macOS arm64 con Python 3.15, una copia limpia de los archivos versionados, instalada con `pip --target` sin el site del usuario ni `.venv` desde `uv export --frozen`, pasó el smoke test con Lightpanda. El workflow todavía no corrió en GitHub, así que Linux y Python 3.11 no tienen evidencia propia.
+  - **Pendiente:** primera ejecución verde del CI; una instalación hecha por otra persona siguiendo la guía.
   - **Cierre:** comandos documentados y ejecutables sin `.venv`, credenciales ni archivos privados. No diseñar CI que dependa de tests ausentes ni agregarlos forzadamente contra la preferencia vigente.
 
 - [ ] **F47 — Unificar diagnósticos seguros y errores recuperables.** **P2 · Parcial.**
@@ -296,6 +303,7 @@ La auditoría documental anterior citaba **138 pruebas locales** y **3 integraci
 - [ ] **F48 — Definir compatibilidad y evolución de los contratos MCP.** **P2 · Parcial.**
   - Documentar qué campos son estables, cómo se agregan capacidades y cómo se anuncian cambios incompatibles. Conservar respuestas tipadas y anotaciones coherentes con los efectos reales.
   - Primer cambio incompatible registrado (F45, 1 de noviembre de 2026): `get_server_info` dejó de devolver `stage` y `campus_features_ready`. Los consumidores deben leer `capabilities` y `registered_tools`.
+  - Avance (18 de noviembre de 2026): [CHANGELOG.md](../CHANGELOG.md) registra versiones y cambios incompatibles, y define la política de compatibilidad (SemVer, con contratos 0.x que pueden romperse solo en versiones menores y con aviso). El nuevo código `CAMPUS_RATE_LIMITED` (F41) es aditivo.
   - **Cierre:** ejemplos y contratos públicos coinciden con el servidor; agregar una capacidad no rompe consumidores existentes sin una migración documentada.
 
 - [ ] **F49 — Mantener una guía local del año y de sus fechas.** **P1 · Parcial.**
@@ -304,16 +312,20 @@ La auditoría documental anterior citaba **138 pruebas locales** y **3 integraci
   - **Pendiente:** comprobar una consulta posterior resuelta con la guía, lectura de avisos y etiquetas (F32, F14) y lectura de documentos en memoria desde el MCP, sin escribir en disco.
   - **Cierre:** una ejecución real genera ambos archivos, declara sus vacíos, no deja documentos temporales y una consulta posterior se resuelve usando la guía.
 
-- [ ] **F50 — Centralizar la traducción de excepciones a errores MCP.** **P1 · Falta.**
+- [x] **F50 — Centralizar la traducción de excepciones a errores MCP.** **P1 · Implementada y verificada localmente.**
   - Cada módulo de `tools/` repite el mismo par `except (<errores de dominio>) … except Exception …` (12 bloques en 7 archivos). Crear un manejador global único, por ejemplo un decorador o envoltorio aplicado al registrar las herramientas, que traduzca los errores de dominio a `ToolError` y asigne el código interno de cada área sin `if`/`else` por herramienta.
   - Conservar los mensajes y códigos actuales (`SUBMISSION_INTERNAL_ERROR`, `UPLOAD_LOCAL_FILE_ERROR` y equivalentes), el aviso de verificar el estado antes de repetir escrituras y el ocultamiento de excepciones crudas. Es la base de F47.
   - **Cierre:** ningún módulo de `tools/` contiene `try`/`except` propio para traducir errores; las pruebas locales cubren un error de dominio, uno de sesión y uno inesperado por área, con los mismos textos que hoy.
+  - Implementación (18 de noviembre de 2026): los cinco errores de dominio heredan de `CampusError` (`errors.py`). `tools/errors.py` define `tool_errors(área)`, un decorador síncrono o asíncrono que conserva firma y docstring. Reenvía los `CampusError` con su código y reemplaza cualquier otra excepción por el mensaje de `INTERNAL_ERRORS[área]`, registrando solo su tipo. Las 16 herramientas lo usan; se eliminaron los 12 bloques repetidos y el envoltorio `call` de entregas.
+  - Diferencia deliberada: antes, cada herramienta reenviaba solo los errores de dominio de su lista (por ejemplo, calendario no reenviaba `CourseError`). Ahora reenvía cualquier `CampusError`, que por contrato solo lleva códigos y mensajes propios. Los textos de los mensajes genéricos no cambiaron.
+  - **Evidencia:** los esquemas MCP de las 16 herramientas (`list_tools`) son idénticos antes y después. `tests/test_tool_errors.py` (46 casos) cubre, para las 14 herramientas con red, un error de dominio, uno de sesión (`LoginError`) y uno inesperado con secretos que no se filtran; además `prepare_submission` (síncrona), el aviso de escritura, el rechazo de áreas desconocidas y la ausencia de `except`/`ToolError` en los módulos de `tools/`. Suite completa: 303 pruebas, 13 integraciones optativas omitidas.
+  - **Cierre satisfecho.** F47 puede construirse sobre este punto único.
 
 ## Orden recomendado
 
-1. **Estabilizar lo ya utilizado:** F41 y las validaciones F12, F13 y F26 (F45 completada el 1 de noviembre de 2026). No bloquea en paralelo las mejoras pequeñas de descubrimiento.
+1. **Estabilizar lo ya utilizado:** validación real de F41 (implementada el 18 de noviembre de 2026) y las validaciones F12, F13 y F26 (F45 completada el 1 de noviembre de 2026). No bloquea en paralelo las mejoras pequeñas de descubrimiento.
 2. **Completar la consulta académica básica:** F01–F05, F07–F10 y F19. El objetivo es poder preguntar por una materia y sus trabajos sin aportar IDs o interpretar enlaces manualmente.
-3. **Incorporar información cotidiana faltante:** lectura de páginas, calificaciones, devoluciones y avisos (F14, F28, F29 y F32). Inmediatamente después de F29, centralizar el manejo de excepciones de las herramientas (F50).
+3. **Incorporar información cotidiana faltante:** lectura de páginas, calificaciones, devoluciones y avisos (F14, F28, F29 y F32). El manejo de excepciones de las herramientas quedó centralizado el 18 de noviembre de 2026 (F50).
 4. **Ampliar materiales y entregas:** búsqueda, lotes, metadatos, edición y reconciliación (F06, F15–F18, F20–F27), según necesidad.
 5. **Evaluar otras áreas:** Timeline, seguimiento, comunicación y módulos opcionales tras inspeccionar sus pantallas y permisos.
 
